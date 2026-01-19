@@ -1,0 +1,234 @@
+version: "3"
+
+vars:
+  SHELL: bash
+  ZIG_VERSION: "0.15"
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  build:wasm:
+    desc: Build hangul.wasm (ReleaseSmall - optimized for size)
+    cmds:
+      - zig build --release=small
+      - cp zig-out/bin/hangul.wasm hangul.wasm
+
+  build:wasm:fast:
+    desc: Build hangul.wasm (ReleaseFast - optimized for speed)
+    cmds:
+      - zig build --release=fast
+      - cp zig-out/bin/hangul.wasm hangul.wasm
+
+  build:wasm:debug:
+    desc: Build hangul.wasm (Debug - with debug info)
+    cmds:
+      - zig build
+      - cp zig-out/bin/hangul.wasm hangul.wasm
+
+  test:
+    desc: Run all tests
+    cmds:
+      - zig build test
+
+  test:verbose:
+    desc: Run tests with verbose output
+    cmds:
+      - zig test hangul.zig -femit-bin=/dev/null
+
+  fmt:
+    desc: Format code with zig fmt
+    cmds:
+      - zig fmt hangul.zig
+
+  fmt:check:
+    desc: Check if code is formatted (CI-friendly)
+    cmds:
+      - zig fmt --check hangul.zig
+
+  lint:
+    desc: Check for Zig code issues
+    cmds:
+      - |
+        echo "Running basic checks..."
+        zig build --release=small
+
+  run:demo:
+    desc: Build WASM and serve the interactive demo on localhost:8120
+    deps: [build:wasm]
+    cmds:
+      - |
+        PORT=8120
+        # Kill any existing process on port 8120
+        if command -v lsof &> /dev/null; then
+          PID=$(lsof -t -i :$PORT 2>/dev/null || true)
+          if [ -n "$PID" ]; then
+            echo "Killing process on port $PORT (PID: $PID)..."
+            kill -9 $PID 2>/dev/null || true
+            sleep 1
+          fi
+        fi
+        
+        if command -v uv &> /dev/null; then
+          echo "Starting web server on http://localhost:$PORT"
+          uv run python -m http.server $PORT
+        else
+          echo "Error: uv not found. Install with: curl -LsSf https://astral.sh/uv/install.sh | sh"
+          exit 1
+        fi
+
+  run:demo:browse:
+    desc: Build WASM, serve demo on localhost:8120, and open in browser
+    deps: [build:wasm]
+    cmds:
+      - |
+        PORT=8120
+        # Kill any existing process on port 8120
+        if command -v lsof &> /dev/null; then
+          PID=$(lsof -t -i :$PORT 2>/dev/null || true)
+          if [ -n "$PID" ]; then
+            echo "Killing process on port $PORT (PID: $PID)..."
+            kill -9 $PID 2>/dev/null || true
+            sleep 1
+          fi
+        fi
+        
+        if command -v uv &> /dev/null; then
+          echo "Starting web server on http://localhost:$PORT"
+          uv run python -m http.server $PORT &
+          SERVER_PID=$!
+          sleep 1
+          if command -v open &> /dev/null; then
+            open http://localhost:$PORT
+          elif command -v xdg-open &> /dev/null; then
+            xdg-open http://localhost:$PORT
+          else
+            echo "Open http://localhost:$PORT in your browser"
+          fi
+          wait $SERVER_PID
+        else
+          echo "Error: uv not found. Install with: curl -LsSf https://astral.sh/uv/install.sh | sh"
+          exit 1
+        fi
+
+  run:demo:kill:
+    desc: Kill the demo server running on port 8120
+    cmds:
+      - |
+        PORT=8120
+        if command -v lsof &> /dev/null; then
+          PID=$(lsof -t -i :$PORT 2>/dev/null || true)
+          if [ -n "$PID" ]; then
+            echo "Killing process on port $PORT (PID: $PID)..."
+            kill -9 $PID 2>/dev/null && echo "Done." || echo "Already dead"
+          else
+            echo "No process running on port $PORT"
+          fi
+        else
+          echo "lsof not found. Cannot check port."
+        fi
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -f hangul.wasm
+      - rm -rf zig-out .zig-cache
+
+  check:
+    desc: Quick compile check without building WASM
+    cmds:
+      - zig build --release=small
+
+  check:all:
+    desc: Run format check, lint, test, and build
+    cmds:
+      - task: fmt:check
+      - task: lint
+      - task: test
+      - task: build:wasm
+
+  pre:commit:
+    desc: Run checks before committing (TDD workflow)
+    cmds:
+      - task: fmt
+      - task: test
+
+  tdd:
+    desc: TDD cycle - watch mode (requires inotify-tools or similar)
+    cmds:
+      - |
+        if command -v watchexec &> /dev/null; then
+          watchexec -e zig task test
+        else
+          echo "Install watchexec for watch mode: cargo install watchexec-cli"
+          echo "Running tests once..."
+          task test
+        fi
+
+  benchmark:
+    desc: Compile and run performance tests
+    cmds:
+      - |
+        echo "Building optimized WASM (ReleaseFast)..."
+        zig build --release=fast
+        cp zig-out/bin/hangul.wasm hangul-fast.wasm
+        echo ""
+        echo "=== Binary Sizes ==="
+        ls -lh hangul*.wasm
+        echo ""
+        echo "ReleaseSmall optimizes for size, ReleaseFast for speed."
+
+  docs:
+    desc: Open the README in your default viewer
+    cmds:
+      - |
+        if command -v open &> /dev/null; then
+          open README.md
+        elif command -v xdg-open &> /dev/null; then
+          xdg-open README.md
+        else
+          cat README.md
+        fi
+
+  version:show:
+    desc: Show project information
+    cmds:
+      - |
+        echo "hangul-wasm - Zig/WASM port of hangul.js"
+        echo "Language: Zig (0.15+)"
+        echo "Target: WebAssembly (wasm32-freestanding)"
+        echo "Status: Active Development"
+
+  ci:
+    desc: Run full CI pipeline (format check, lint, test, build)
+    deps: [fmt:check, lint, test, build:wasm]
+    cmds:
+      - |
+        echo "CI pipeline complete!"
+        ls -lh hangul.wasm 2>/dev/null || echo "WASM file: not built"
+
+  install:tools:
+    desc: Install useful development tools
+    cmds:
+      - |
+        echo "Checking for optional tools..."
+        if ! command -v watchexec &> /dev/null; then
+          echo "Consider installing watchexec for TDD: cargo install watchexec-cli"
+        else
+          echo "watchexec is installed"
+        fi
+        echo ""
+        echo "Required: Zig 0.15+"
+        zig version
+
+  loc:count:
+    desc: Count lines of code
+    cmds:
+      - |
+        echo "=== hangul-wasm LoC ==="
+        wc -l hangul.zig index.html README.md AGENTS.md 2>/dev/null || echo "Some files not found"
+        echo ""
+        echo "Total files:"
+        ls -1 | wc -l

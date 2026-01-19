@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>hangul-wasm: Korean Text Processing</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        --primary: #d4a5d4;
+        --secondary: #f5b3d4;
+        --accent: #c4d9e8;
+        --tertiary: #f0d9c1;
+        --text-dark: #3d3d4d;
+        --text-light: #6b7a8a;
+        --border: #e8dce8;
+        --success: #b8d9c1;
+        --loading: #f5c99e;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+        background: linear-gradient(135deg, #faf5f8 0%, #f5f0f8 100%);
+        min-height: 100vh;
+        padding: 2rem 1rem;
+        color: var(--text-dark);
+        line-height: 1.6;
+      }
+
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(212, 165, 212, 0.12);
+        overflow: hidden;
+      }
+
+      /* Header */
+      .header {
+        background: linear-gradient(135deg, #f5f0f8 0%, #faf5f8 100%);
+        border-bottom: 2px solid var(--border);
+        padding: 3rem 2rem;
+        text-align: center;
+      }
+
+      .header h1 {
+        font-size: 2.8rem;
+        color: var(--text-dark);
+        margin-bottom: 0.5rem;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+      }
+
+      .header .subtitle {
+        font-size: 1rem;
+        color: var(--text-light);
+        font-weight: 400;
+        margin-bottom: 1.5rem;
+      }
+
+      .version-badge {
+        display: inline-block;
+        background: var(--accent);
+        color: var(--text-dark);
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        border: 1px solid #d9e8f0;
+      }
+
+      #status {
+        margin-top: 1.5rem;
+        padding: 1rem;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-align: center;
+        background: var(--accent);
+        color: #4a6b8a;
+        border: 1px solid #b8d4e8;
+      }
+
+      #status.loading {
+        background: var(--loading);
+        color: #8b5a2b;
+        border-color: #f5d4a3;
+      }
+
+      #status.success {
+        background: var(--success);
+        color: #3d7a5a;
+        border-color: #a8d4bb;
+      }
+
+
+
+      /* Main content */
+      .content {
+        padding: 2rem;
+      }
+
+      .demo-section {
+        margin-bottom: 2.5rem;
+        padding: 2rem;
+        background: #fefbfd;
+        border-radius: 12px;
+        border-left: 4px solid var(--primary);
+        border: 1px solid var(--border);
+        border-left: 4px solid var(--primary);
+        transition: all 0.3s ease;
+      }
+
+      .demo-section:hover {
+        box-shadow: 0 4px 16px rgba(212, 165, 212, 0.1);
+      }
+
+      .section-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .section-icon {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .section-icon svg {
+        width: 24px;
+        height: 24px;
+        stroke: var(--primary);
+        stroke-width: 1.5;
+        fill: none;
+      }
+
+      .demo-section h2 {
+        font-size: 1.4rem;
+        color: var(--text-dark);
+        font-weight: 600;
+        margin: 0;
+      }
+
+      .label {
+        display: block;
+        font-weight: 600;
+        margin: 1rem 0 0.5rem;
+        color: var(--text-dark);
+        font-size: 0.95rem;
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 1.5px solid var(--border);
+        border-radius: 8px;
+        font-size: 1rem;
+        font-family: "Malgun Gothic", "맑은 고딕", -apple-system, sans-serif;
+        color: var(--text-dark);
+        transition: all 0.3s ease;
+        background: #fafbfc;
+      }
+
+      input:focus,
+      textarea:focus {
+        outline: none;
+        border-color: var(--primary);
+        background: #ffffff;
+        box-shadow: 0 0 0 3px rgba(212, 165, 212, 0.1);
+      }
+
+      textarea {
+        resize: vertical;
+        min-height: 100px;
+        font-size: 0.95rem;
+      }
+
+      .compose-inputs {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        margin: 1.5rem 0;
+      }
+
+      .compose-inputs input {
+        text-align: center;
+        font-size: 1.2rem;
+        font-weight: 600;
+      }
+
+      .result {
+        margin-top: 1.5rem;
+        padding: 1.5rem;
+        background: #ffffff;
+        border-radius: 8px;
+        border: 1.5px solid var(--border);
+        min-height: 60px;
+        font-size: 1rem;
+        font-family: "Malgun Gothic", "맑은 고딕", -apple-system, monospace;
+        word-break: break-all;
+        color: var(--text-dark);
+        display: flex;
+        align-items: center;
+      }
+
+      .jamo-display {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 1.5rem;
+        flex-wrap: wrap;
+      }
+
+      .jamo-box {
+        padding: 0.75rem 1rem;
+        background: linear-gradient(135deg, #f5d4d4 0%, #f5c1d4 100%);
+        color: #7a4a5a;
+        border: 1.5px solid #f5b8d4;
+        border-radius: 8px;
+        font-size: 1.3rem;
+        font-weight: 600;
+        min-width: 56px;
+        text-align: center;
+        transition: all 0.3s ease;
+      }
+
+      .jamo-box:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(245, 180, 212, 0.3);
+      }
+
+      .jamo-box.non-hangul {
+        background: #e8e8f0;
+        color: #6b7a8a;
+        border-color: #d9dce8;
+      }
+
+      button {
+        background: linear-gradient(135deg, var(--primary) 0%, #d4a5d4 100%);
+        color: white;
+        border: none;
+        padding: 0.875rem 2rem;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        width: 100%;
+        margin-top: 1rem;
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(212, 165, 212, 0.3);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .info {
+        background: linear-gradient(135deg, #f0f8ff 0%, #f0f5ff 100%);
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid var(--accent);
+        margin-top: 1rem;
+        font-size: 0.9rem;
+        color: var(--text-light);
+        line-height: 1.6;
+      }
+
+      .info strong {
+        color: var(--text-dark);
+        font-weight: 600;
+      }
+
+      /* Property display */
+      .property-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+
+      .property-item {
+        padding: 1rem;
+        background: #fefbfd;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+      }
+
+      .property-label {
+        font-size: 0.85rem;
+        color: var(--text-light);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.5rem;
+      }
+
+      .property-value {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: var(--text-dark);
+        font-family: "Malgun Gothic", "맑은 고딕", monospace;
+      }
+
+      /* Footer */
+      .footer {
+        background: #faf5f8;
+        border-top: 1px solid var(--border);
+        padding: 2rem;
+        text-align: center;
+        color: var(--text-light);
+        font-size: 0.9rem;
+      }
+
+      .footer a {
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 600;
+        transition: color 0.3s ease;
+      }
+
+      .footer a:hover {
+        color: var(--secondary);
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .header {
+          padding: 2rem 1rem;
+        }
+
+        .header h1 {
+          font-size: 2rem;
+        }
+
+        .content {
+          padding: 1rem;
+        }
+
+        .demo-section {
+          padding: 1.5rem;
+        }
+
+        .compose-inputs {
+          grid-template-columns: 1fr;
+        }
+
+        .property-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* Utility */
+      .no-result {
+        color: var(--text-light);
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <div class="header">
+        <h1>hangul-wasm</h1>
+        <div class="subtitle">High-performance Korean text processing</div>
+        <div class="version-badge">Zig/WebAssembly</div>
+        <div id="status" class="status loading">Loading WASM module...</div>
+      </div>
+
+      <!-- Content -->
+      <div class="content">
+        <!-- Decompose Section -->
+        <div class="demo-section">
+          <div class="section-header">
+            <div class="section-icon">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" />
+                <path d="M8 8l-4 4 4 4M16 8l4 4-4 4" stroke="currentColor" />
+              </svg>
+            </div>
+            <h2>Decompose (분해)</h2>
+          </div>
+          <label class="label">Enter Korean text:</label>
+          <input
+            type="text"
+            id="decomposeInput"
+            placeholder="e.g., 한글"
+            value="한글"
+          />
+          <div class="result" id="decomposeResult"></div>
+          <div class="jamo-display" id="jamoDisplay"></div>
+          <div class="info">
+            Breaks down Hangul syllables into their jamo components (초성, 중성, 종성).
+          </div>
+        </div>
+
+        <!-- Compose Section -->
+        <div class="demo-section">
+          <div class="section-header">
+            <div class="section-icon">
+              <svg viewBox="0 0 24 24">
+                <path d="M7 12h10M12 7v10" stroke="currentColor" />
+                <circle cx="12" cy="12" r="10" stroke="currentColor" />
+              </svg>
+            </div>
+            <h2>Compose (조합)</h2>
+          </div>
+          <label class="label">Enter jamo components:</label>
+          <div class="compose-inputs">
+            <div>
+              <label class="label" style="margin: 0 0 0.5rem; font-size: 0.85rem; text-transform: uppercase;">Initial</label>
+              <input
+                type="text"
+                id="initialInput"
+                placeholder="ㅎ"
+                value="ㅎ"
+                maxlength="1"
+              />
+            </div>
+            <div>
+              <label class="label" style="margin: 0 0 0.5rem; font-size: 0.85rem; text-transform: uppercase;">Medial</label>
+              <input
+                type="text"
+                id="medialInput"
+                placeholder="ㅏ"
+                value="ㅏ"
+                maxlength="1"
+              />
+            </div>
+            <div>
+              <label class="label" style="margin: 0 0 0.5rem; font-size: 0.85rem; text-transform: uppercase;">Final</label>
+              <input
+                type="text"
+                id="finalInput"
+                placeholder="ㄴ"
+                value="ㄴ"
+                maxlength="1"
+              />
+            </div>
+          </div>
+          <button onclick="composeHangul()">Compose</button>
+          <div class="result" id="composeResult" style="font-size: 2rem; justify-content: center;"></div>
+          <div class="info">
+            Combines jamo components into a complete Hangul syllable.
+          </div>
+        </div>
+
+        <!-- Properties Section -->
+        <div class="demo-section">
+          <div class="section-header">
+            <div class="section-icon">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" />
+                <path d="M12 6v6M12 15v0.01" stroke="currentColor" />
+              </svg>
+            </div>
+            <h2>Character Properties (속성)</h2>
+          </div>
+          <label class="label">Enter a single character:</label>
+          <input
+            type="text"
+            id="checkInput"
+            placeholder="한"
+            value="한"
+            maxlength="1"
+          />
+          <div class="result" id="checkResult"></div>
+        </div>
+
+        <!-- Decompose String Section -->
+        <div class="demo-section">
+          <div class="section-header">
+            <div class="section-icon">
+              <svg viewBox="0 0 24 24">
+                <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" />
+              </svg>
+            </div>
+            <h2>Decompose String (문자열 분해)</h2>
+          </div>
+          <label class="label">Enter Korean text:</label>
+          <textarea
+            id="stringInput"
+            placeholder="e.g., 안녕하세요"
+          >안녕하세요</textarea>
+          <div class="result" id="stringResult"></div>
+          <div class="info">
+            Processes entire strings, decomposing Hangul while preserving other characters.
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="footer">
+        <p>
+          <a href="https://github.com/kwseok/hangul.js">hangul.js</a> port to
+          <a href="https://ziglang.org">Zig</a> + 
+          <a href="https://webassembly.org">WebAssembly</a>
+        </p>
+        <p style="margin-top: 0.5rem; font-size: 0.85rem;">
+          MIT License • 
+          <a href="https://github.com/pastel-sketchbook/hangul-wasm">Source Code</a>
+        </p>
+      </div>
+    </div>
+
+    <script>
+      // Hangul decomposition/composition logic
+      const HANGUL_BASE = 0xac00;
+      const HANGUL_END = 0xd7a3;
+
+      const INITIALS = [
+        "ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ",
+        "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ",
+      ];
+      const MEDIALS = [
+        "ㅏ", "ㅐ", "ㅑ", "ㅒ", "ㅓ", "ㅔ", "ㅕ", "ㅖ", "ㅗ", "ㅘ",
+        "ㅙ", "ㅚ", "ㅛ", "ㅜ", "ㅝ", "ㅞ", "ㅟ", "ㅠ", "ㅡ", "ㅢ", "ㅣ",
+      ];
+      const FINALS = [
+        "", "ㄱ", "ㄲ", "ㄳ", "ㄴ", "ㄵ", "ㄶ", "ㄷ", "ㄹ", "ㄺ", "ㄻ",
+        "ㄼ", "ㄽ", "ㄾ", "ㄿ", "ㅀ", "ㅁ", "ㅂ", "ㅄ", "ㅅ", "ㅆ", "ㅇ",
+        "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ",
+      ];
+
+      function isHangul(char) {
+        const code = char.charCodeAt(0);
+        return code >= HANGUL_BASE && code <= HANGUL_END;
+      }
+
+      function decompose(char) {
+        if (!isHangul(char)) return null;
+        const code = char.charCodeAt(0) - HANGUL_BASE;
+        const finalIdx = code % 28;
+        const medialIdx = Math.floor((code - finalIdx) / 28) % 21;
+        const initialIdx = Math.floor((code - finalIdx) / 28 / 21);
+        return {
+          initial: INITIALS[initialIdx],
+          medial: MEDIALS[medialIdx],
+          final: FINALS[finalIdx],
+        };
+      }
+
+      function compose(initial, medial, final = "") {
+        const initialIdx = INITIALS.indexOf(initial);
+        const medialIdx = MEDIALS.indexOf(medial);
+        const finalIdx = FINALS.indexOf(final);
+        if (initialIdx === -1 || medialIdx === -1 || finalIdx === -1)
+          return null;
+        const code =
+          HANGUL_BASE + initialIdx * 21 * 28 + medialIdx * 28 + finalIdx;
+        return String.fromCharCode(code);
+      }
+
+      function decomposeString(str) {
+        let result = [];
+        for (let char of str) {
+          if (isHangul(char)) {
+            const jamo = decompose(char);
+            result.push(jamo.initial, jamo.medial);
+            if (jamo.final) result.push(jamo.final);
+          } else {
+            result.push(char);
+          }
+        }
+        return result.join("");
+      }
+
+      function hasFinal(char) {
+        if (!isHangul(char)) return false;
+        const code = char.charCodeAt(0) - HANGUL_BASE;
+        return code % 28 !== 0;
+      }
+
+      // Event Handlers
+      document
+        .getElementById("decomposeInput")
+        .addEventListener("input", function (e) {
+          const text = e.target.value;
+          const resultDiv = document.getElementById("decomposeResult");
+          const jamoDiv = document.getElementById("jamoDisplay");
+
+          if (!text) {
+            resultDiv.textContent = "";
+            jamoDiv.innerHTML = "";
+            return;
+          }
+
+          let hasHangul = false;
+          let jamoBoxes = "";
+          let decomposedText = "";
+
+          for (let char of text) {
+            const code = char.charCodeAt(0);
+            let isHangulChar = false;
+            let jamo = null;
+
+            // Use WASM if available and working
+              if (window.wasmModule && typeof window.wasmModule.wasm_isHangulSyllable === 'function') {
+                try {
+                  if (window.wasmModule.wasm_isHangulSyllable(code)) {
+                    // Allocate memory for output (3 x u32 = 12 bytes)
+                    const bufPtr = window.wasmModule.wasm_alloc(12);
+                    if (bufPtr !== 0 && window.wasmModule.wasm_decompose(code, bufPtr)) {
+                      // Read the output values from WASM memory
+                      const memory = new Uint32Array(window.wasmModule.memory.buffer);
+                      const offset = bufPtr / 4; // Convert byte offset to u32 offset
+                      jamo = {
+                        initial: String.fromCharCode(memory[offset]),
+                        medial: String.fromCharCode(memory[offset + 1]),
+                        final: memory[offset + 2] !== 0 ? String.fromCharCode(memory[offset + 2]) : "",
+                      };
+                      window.wasmModule.wasm_free(bufPtr, 12);
+                      isHangulChar = true;
+                    }
+                  }
+                } catch (e) {
+                  console.error("WASM function error:", e);
+                  // Fall through to JavaScript
+                }
+              }
+            
+            if (!isHangulChar && isHangul(char)) {
+              isHangulChar = true;
+              jamo = decompose(char);
+            }
+
+            if (isHangulChar) {
+              hasHangul = true;
+              decomposedText += `${jamo.initial}${jamo.medial}${jamo.final || ""}`;
+              jamoBoxes += `<div class="jamo-box">${jamo.initial}</div>`;
+              jamoBoxes += `<div class="jamo-box">${jamo.medial}</div>`;
+              if (jamo.final) {
+                jamoBoxes += `<div class="jamo-box">${jamo.final}</div>`;
+              }
+            } else {
+              decomposedText += char;
+              jamoBoxes += `<div class="jamo-box non-hangul">${char}</div>`;
+            }
+          }
+
+          if (hasHangul) {
+            resultDiv.textContent = decomposedText;
+            jamoDiv.innerHTML = jamoBoxes;
+          } else {
+            resultDiv.textContent = "";
+            resultDiv.classList.add("no-result");
+            jamoDiv.innerHTML = "";
+          }
+        });
+
+      function composeHangul() {
+        const initial = document.getElementById("initialInput").value;
+        const medial = document.getElementById("medialInput").value;
+        const final = document.getElementById("finalInput").value;
+        const resultDiv = document.getElementById("composeResult");
+
+        if (!initial || !medial) {
+          resultDiv.textContent = "Initial and medial are required";
+          resultDiv.classList.remove("no-result");
+          return;
+        }
+
+        let result = null;
+
+        // Use WASM if available
+        if (window.wasmModule) {
+          const initialCode = initial.charCodeAt(0);
+          const medialCode = medial.charCodeAt(0);
+          const finalCode = final ? final.charCodeAt(0) : 0;
+          const composed = window.wasmModule.wasm_compose(initialCode, medialCode, finalCode);
+          if (composed) {
+            result = String.fromCharCode(composed);
+          }
+        } else {
+          result = compose(initial, medial, final);
+        }
+
+        if (result) {
+          resultDiv.textContent = result;
+          resultDiv.classList.remove("no-result");
+        } else {
+          resultDiv.textContent = "Invalid jamo combination";
+          resultDiv.classList.add("no-result");
+        }
+      }
+
+      document
+        .getElementById("checkInput")
+        .addEventListener("input", function (e) {
+          const char = e.target.value;
+          const resultDiv = document.getElementById("checkResult");
+
+          if (!char) {
+            resultDiv.textContent = "";
+            return;
+          }
+
+          const code = char.charCodeAt(0);
+          let isHangulChar = false;
+          let jamo = null;
+          let final = false;
+
+          // Use WASM if available
+          if (window.wasmModule && window.wasmModule.wasm_isHangulSyllable(code)) {
+            const bufPtr = window.wasmModule.wasm_alloc(12);
+            if (bufPtr !== 0 && window.wasmModule.wasm_decompose(code, bufPtr)) {
+              const memory = new Uint32Array(window.wasmModule.memory.buffer);
+              const offset = bufPtr / 4;
+              jamo = {
+                initial: String.fromCharCode(memory[offset]),
+                medial: String.fromCharCode(memory[offset + 1]),
+                final: memory[offset + 2] !== 0 ? String.fromCharCode(memory[offset + 2]) : "",
+              };
+              window.wasmModule.wasm_free(bufPtr, 12);
+              isHangulChar = true;
+            }
+            final = window.wasmModule.wasm_hasFinal(code);
+          } else if (isHangul(char)) {
+            isHangulChar = true;
+            jamo = decompose(char);
+            final = hasFinal(char);
+          }
+
+          if (isHangulChar) {
+            resultDiv.innerHTML = `
+              <div class="property-grid">
+                <div class="property-item">
+                  <div class="property-label">Is Hangul</div>
+                  <div class="property-value">✓</div>
+                </div>
+                <div class="property-item">
+                  <div class="property-label">Has Final (받침)</div>
+                  <div class="property-value">${final ? "Yes" : "No"}</div>
+                </div>
+                <div class="property-item">
+                  <div class="property-label">Initial</div>
+                  <div class="property-value">${jamo.initial}</div>
+                </div>
+                <div class="property-item">
+                  <div class="property-label">Medial</div>
+                  <div class="property-value">${jamo.medial}</div>
+                </div>
+                <div class="property-item">
+                  <div class="property-label">Final</div>
+                  <div class="property-value">${jamo.final || "—"}</div>
+                </div>
+              </div>
+            `;
+          } else {
+            resultDiv.innerHTML =
+              '<span class="no-result">Not a Hangul syllable</span>';
+          }
+        });
+
+      document
+        .getElementById("stringInput")
+        .addEventListener("input", function (e) {
+          const text = e.target.value;
+          const resultDiv = document.getElementById("stringResult");
+
+          if (!text) {
+            resultDiv.textContent = "";
+            return;
+          }
+
+          // Use WASM if available for string decomposition
+          let result = "";
+          if (window.wasmModule && window.wasmModule.wasm_decomposeString) {
+            // WASM string processing (if implemented)
+            result = decomposeString(text);
+          } else {
+            result = decomposeString(text);
+          }
+
+          resultDiv.textContent = result;
+        });
+
+      // Initialize WASM module (optional - JavaScript fallback is fully functional)
+      async function initializeWasm() {
+        try {
+          const response = await fetch("hangul.wasm");
+          if (!response.ok) {
+            updateStatus("Ready (JavaScript implementation)", "success");
+            return;
+          }
+          const buffer = await response.arrayBuffer();
+          // Provide imports that Zig expects
+          const memory = new WebAssembly.Memory({ initial: 256, maximum: 512 });
+          const stackPointer = new WebAssembly.Global({ value: 'i32', mutable: true }, 0);
+          const table = new WebAssembly.Table({ initial: 128, element: 'anyfunc' });
+          
+          // Zig runtime helper functions
+          const __multi3 = () => 0; // Stub
+          
+          const imports = { 
+            env: { 
+              __linear_memory: memory,
+              __stack_pointer: stackPointer,
+              __indirect_function_table: table,
+              __multi3: __multi3
+            } 
+          };
+          const { instance } = await WebAssembly.instantiate(buffer, imports);
+          window.wasmModule = instance.exports;
+          
+          // Verify key functions are exported
+          if (window.wasmModule && typeof window.wasmModule.wasm_isHangulSyllable === 'function') {
+            updateStatus("Ready (WASM loaded)", "success");
+            console.log("WASM module loaded successfully");
+          } else {
+            console.log("WASM loaded but functions unavailable, using JavaScript");
+            window.wasmModule = null;
+            updateStatus("Ready (JavaScript implementation)", "success");
+          }
+        } catch (error) {
+          console.log("WASM initialization skipped, using JavaScript:", error.message);
+          updateStatus("Ready (JavaScript implementation)", "success");
+        }
+      }
+
+      function updateStatus(message, className) {
+        const statusEl = document.getElementById("status");
+        statusEl.textContent = message;
+        statusEl.className = `status ${className}`;
+        console.log("Status:", message);
+      }
+
+      // Trigger initial updates
+      document
+        .getElementById("decomposeInput")
+        .dispatchEvent(new Event("input"));
+      document.getElementById("checkInput").dispatchEvent(new Event("input"));
+      document.getElementById("stringInput").dispatchEvent(new Event("input"));
+
+      // Initialize WASM
+      initializeWasm();
+    </script>
+  </body>
+</html>

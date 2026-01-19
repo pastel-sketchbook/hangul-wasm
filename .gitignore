@@ -1,0 +1,17 @@
+# Build artifacts
+hangul-fast.wasm
+hangul.wasm
+hangul.o
+*.wasm
+*.o
+*.a
+
+# Zig build system
+zig-out/
+.zig-cache/
+
+# OS files
+.DS_Store
+
+# Test scripts
+test_wasm.js

@@ -267,3 +267,9 @@ tasks:
       - task: debug:enable
       - task: run:demo
       - defer: { task: debug:disable }
+
+  run:sample:
+    desc: Run the Bun/TypeScript sample demo
+    deps: [build:wasm]
+    cmds:
+      - bun samples/hangul-demo.ts

@@ -249,19 +249,13 @@ const hasFinal = window.wasmModule.wasm_hasFinal(0xD55C); // '한'
 console.log(hasFinal); // true
 ```
 
-### Node.js
+### Bun
 
 ```javascript
-const fs = require('fs');
-
 // Load WASM module
-async function loadHangul() {
-  const wasmBuffer = fs.readFileSync('hangul.wasm');
-  const { instance } = await WebAssembly.instantiate(wasmBuffer);
-  return instance.exports;
-}
-
-const hangul = await loadHangul();
+const wasmBuffer = await Bun.file('hangul.wasm').arrayBuffer();
+const { instance } = await WebAssembly.instantiate(wasmBuffer);
+const hangul = instance.exports;
 
 // Use the same API as browser
 const isHangul = hangul.wasm_isHangulSyllable(0xD55C);
@@ -483,9 +477,9 @@ Typical WASM execution is 10-100x faster than equivalent JavaScript for large te
 
 - All modern browsers with WebAssembly support (Chrome 57+, Firefox 52+, Safari 14.1+, Edge 15+)
 
-### Node.js Support
+### Bun Support
 
-- Node.js 22+ (native WebAssembly support)
+- Bun 1.0+ (native WebAssembly support)
 
 ## Differences from Original hangul.js
 

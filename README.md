@@ -418,6 +418,8 @@ task clean            # Remove build artifacts
 
 This project is a Zig/WebAssembly port of [**hangul.js**](https://github.com/kwseok/hangul.js) by [kwseok](https://github.com/kwseok). The original library provided the algorithmic foundation and API design that informed this implementation.
 
+**ohi.js** ([Ho-Seok Ee](https://gist.github.com/channy/5943520)) - Korean IME implementation that inspired the design analysis in [docs/rationale/0002_ohi_js_ime_port_strategy.md](./docs/rationale/0002_ohi_js_ime_port_strategy.md). The original ohi.js provides browser-based Korean input method functionality for Dubeolsik (2-bulsik) and Sebeolsik (3-bulsik) keyboard layouts.
+
 ## License
 
 MIT
@@ -425,6 +427,7 @@ MIT
 ## References
 
 - [Original hangul.js Repository](https://github.com/kwseok/hangul.js)
+- [ohi.js - Korean IME](https://gist.github.com/channy/5943520) by Ho-Seok Ee
 - [Unicode Hangul Block Specification](https://www.unicode.org/charts/PDF/UAC00.pdf)
 - [Zig Language Documentation](https://ziglang.org/documentation/master/)
 - [WebAssembly Specification](https://webassembly.org/)

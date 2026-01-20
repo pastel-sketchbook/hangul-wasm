@@ -31,6 +31,47 @@ const COMPAT_FINAL = [_]u32{
     0x314A, 0x314B, 0x314C, 0x314D, 0x314E,
 };
 
+// Index mapping tables for ohi.js compatibility
+// ohi.js uses custom indices (1-30 for consonants, 31-51 for vowels)
+// These need conversion to array indices for COMPAT_INITIAL/MEDIAL/FINAL
+
+/// Convert ohi.js initial consonant index to COMPAT_INITIAL array index
+/// Based on ohi.js line 65: i - (i < 3 ? 1 : i < 5 ? 2 : i < 10 ? 4 : i < 20 ? 11 : 12)
+fn ohiIndexToInitialIdx(i: i8) u8 {
+    if (i <= 0) return 0;
+    const val: u8 = @intCast(i);
+    if (val < 3) return val - 1;
+    if (val < 5) return val - 2;
+    if (val < 10) return val - 4;
+    if (val < 20) return val - 11;
+    return val - 12;
+}
+
+/// Convert ohi.js medial vowel index to COMPAT_MEDIAL array index
+/// Based on ohi.js line 66: j - 31
+fn ohiIndexToMedialIdx(j: i8) u8 {
+    if (j < 31) return 0;
+    return @intCast(j - 31);
+}
+
+/// Convert ohi.js final consonant index to COMPAT_FINAL array index
+/// Based on ohi.js line 67-68: k - (k < 8 ? 0 : k < 19 ? 1 : k < 25 ? 2 : 3)
+fn ohiIndexToFinalIdx(k: i8) u8 {
+    if (k <= 0) return 0;
+    const val: u8 = @intCast(k);
+    if (val < 8) return val - 0;
+    if (val < 19) return val - 1;
+    if (val < 25) return val - 2;
+    return val - 3;
+}
+
+/// Convert ohi.js index to single jamo Unicode code point
+/// Based on ohi.js line 69: 0x3130 + (i || j || k)
+fn ohiIndexToSingleJamo(idx: i8) u32 {
+    if (idx <= 0) return 0;
+    return 0x3130 + @as(u32, @intCast(idx));
+}
+
 // Jamo decomposition result
 pub const JamoDecomp = struct {
     initial: u32,
@@ -476,6 +517,569 @@ test "wasm_decompose_safe buffer validation" {
     // Test with invalid syllable
     const invalid = wasm_decompose_safe(0x1234, output_ptr, 3);
     try std.testing.expect(!invalid);
+}
+
+// ============================================================================
+// IME Tests
+// ============================================================================
+
+test "ime state initialization" {
+    const state = ImeState.init();
+    try std.testing.expect(state.isEmpty());
+    try std.testing.expectEqual(@as(u32, 0), state.toCodepoint());
+}
+
+test "ime state reset" {
+    var state = ImeState.init();
+    state.initial = 1;
+    state.medial = 1;
+    state.final = 1;
+    try std.testing.expect(!state.isEmpty());
+
+    state.reset();
+    try std.testing.expect(state.isEmpty());
+}
+
+test "ime state single jamo" {
+    var state = ImeState.init();
+    state.initial = 1; // ㄱ (index 0 in COMPAT_INITIAL)
+    try std.testing.expectEqual(@as(u32, 0x3131), state.toCodepoint()); // ㄱ
+
+    state.reset();
+    state.medial = 31; // ㅏ (index 31 in ohi.js = index 0 in COMPAT_MEDIAL)
+    try std.testing.expectEqual(@as(u32, 0x314F), state.toCodepoint()); // ㅏ
+
+    state.reset();
+    state.final = 1; // ㄱ (index 1 in COMPAT_FINAL)
+    try std.testing.expectEqual(@as(u32, 0x3131), state.toCodepoint()); // ㄱ
+}
+
+test "ime state compose syllable" {
+    var state = ImeState.init();
+    state.initial = 1; // ㄱ
+    state.medial = 31; // ㅏ
+    try std.testing.expectEqual(@as(u32, 0xAC00), state.toCodepoint()); // 가
+
+    state.final = 4; // ㄴ (index 4 in COMPAT_FINAL)
+    try std.testing.expectEqual(@as(u32, 0xAC04), state.toCodepoint()); // 간
+}
+
+test "keyboard layout 2-bulsik basic mapping" {
+    // Test consonants
+    try std.testing.expectEqual(@as(u8, 1), mapKeycode2Bulsik('r', false).?); // ㄱ
+    try std.testing.expectEqual(@as(u8, 4), mapKeycode2Bulsik('s', false).?); // ㄴ
+    try std.testing.expectEqual(@as(u8, 21), mapKeycode2Bulsik('t', false).?); // ㅅ
+
+    // Test vowels
+    try std.testing.expectEqual(@as(u8, 31), mapKeycode2Bulsik('k', false).?); // ㅏ
+    try std.testing.expectEqual(@as(u8, 32), mapKeycode2Bulsik('o', false).?); // ㅐ
+    try std.testing.expectEqual(@as(u8, 51), mapKeycode2Bulsik('l', false).?); // ㅣ
+}
+
+test "double jamo: initial consonants" {
+    // ㄱ+ㄱ=ㄲ
+    try std.testing.expectEqual(@as(u8, 2), detectDoubleJamo(.initial, 1, 1));
+    // ㄷ+ㄷ=ㄸ
+    try std.testing.expectEqual(@as(u8, 8), detectDoubleJamo(.initial, 7, 7));
+    // ㅅ+ㅅ=ㅆ
+    try std.testing.expectEqual(@as(u8, 19), detectDoubleJamo(.initial, 18, 18));
+
+    // Cannot double
+    try std.testing.expectEqual(@as(u8, 0), detectDoubleJamo(.initial, 1, 4)); // ㄱ+ㄴ
+}
+
+test "double jamo: medial vowels" {
+    // ㅗ+ㅏ=ㅘ
+    try std.testing.expectEqual(@as(u8, 40), detectDoubleJamo(.medial, 39, 31));
+    // ㅜ+ㅓ=ㅝ
+    try std.testing.expectEqual(@as(u8, 45), detectDoubleJamo(.medial, 44, 35));
+    // ㅡ+ㅣ=ㅢ
+    try std.testing.expectEqual(@as(u8, 50), detectDoubleJamo(.medial, 49, 51));
+
+    // Cannot double
+    try std.testing.expectEqual(@as(u8, 0), detectDoubleJamo(.medial, 31, 32)); // ㅏ+ㅐ
+}
+
+test "double jamo: final consonants" {
+    // ㄱ+ㅅ=ㄳ
+    try std.testing.expectEqual(@as(u8, 3), detectDoubleJamo(.final, 1, 19));
+    // ㄴ+ㅈ=ㄵ
+    try std.testing.expectEqual(@as(u8, 5), detectDoubleJamo(.final, 4, 22));
+    // ㄴ+ㅎ=ㄶ
+    try std.testing.expectEqual(@as(u8, 6), detectDoubleJamo(.final, 4, 27));
+    // ㅂ+ㅅ=ㅄ
+    try std.testing.expectEqual(@as(u8, 20), detectDoubleJamo(.final, 18, 19));
+
+    // Cannot double
+    try std.testing.expectEqual(@as(u8, 0), detectDoubleJamo(.final, 1, 4)); // ㄱ+ㄴ
+}
+
+test "2-bulsik: type single consonant" {
+    var state = ImeState.init();
+
+    // Type 'r' (ㄱ, index 1)
+    const result = processConsonant2Bulsik(&state, 1);
+    try std.testing.expectEqual(@as(@TypeOf(result.action), .replace), result.action);
+    try std.testing.expectEqual(@as(u32, 0x3131), result.current_codepoint); // ㄱ
+    try std.testing.expectEqual(@as(i8, 1), state.initial);
+}
+
+test "2-bulsik: type 가 (g-a)" {
+    var state = ImeState.init();
+
+    // Type ㄱ
+    _ = processConsonant2Bulsik(&state, 1);
+
+    // Type ㅏ
+    const result = processVowel2Bulsik(&state, 31);
+    try std.testing.expectEqual(@as(@TypeOf(result.action), .replace), result.action);
+    try std.testing.expectEqual(@as(u32, 0xAC00), result.current_codepoint); // 가
+}
+
+test "2-bulsik: type 한 (han)" {
+    var state = ImeState.init();
+
+    // Type ㅎ + ㅏ + ㄴ -> 한 using correct ohi.js indices
+    _ = processConsonant2Bulsik(&state, 30); // ㅎ
+    _ = processVowel2Bulsik(&state, 31); // ㅏ
+    const result = processConsonant2Bulsik(&state, 4); // ㄴ
+
+    try std.testing.expectEqual(@as(u32, 0xD55C), result.current_codepoint); // 한
+}
+
+test "2-bulsik: double consonant ㄲ" {
+    var state = ImeState.init();
+
+    // Type ㄱ twice
+    _ = processConsonant2Bulsik(&state, 1);
+    const result = processConsonant2Bulsik(&state, 1);
+
+    try std.testing.expectEqual(@as(@TypeOf(result.action), .replace), result.action);
+    try std.testing.expectEqual(@as(u32, 0x3132), result.current_codepoint); // ㄲ
+}
+
+test "2-bulsik: double vowel ㅘ (ㅗ+ㅏ)" {
+    var state = ImeState.init();
+
+    // Type ㄱ + ㅗ + ㅏ -> 과
+    _ = processConsonant2Bulsik(&state, 1); // ㄱ
+    _ = processVowel2Bulsik(&state, 39); // ㅗ
+    const result = processVowel2Bulsik(&state, 31); // ㅏ
+
+    // ㅗ+ㅏ=ㅘ, so should get 과 (ㄱ + ㅘ)
+    // 과 = U+ACFC (verified with Python unicodedata)
+    try std.testing.expectEqual(@as(u32, 0xACFC), result.current_codepoint); // 과
+}
+
+test "2-bulsik: syllable split" {
+    var state = ImeState.init();
+
+    // Type 한 (ㅎ+ㅏ+ㄴ) using correct ohi.js indices
+    _ = processConsonant2Bulsik(&state, 30); // ㅎ
+    _ = processVowel2Bulsik(&state, 31); // ㅏ
+    _ = processConsonant2Bulsik(&state, 4); // ㄴ -> 한
+
+    // Type ㅏ again -> should split into "하" + "ㄴㅏ"
+    const result = processVowel2Bulsik(&state, 31); // ㅏ
+
+    try std.testing.expectEqual(@as(@TypeOf(result.action), .emit_and_new), result.action);
+    try std.testing.expectEqual(@as(u32, 0xD558), result.prev_codepoint); // 하
+    // Current should be ㄴㅏ (나 without final)
+    try std.testing.expect(result.current_codepoint != 0);
+}
+
+test "2-bulsik: emit on new consonant after complete syllable" {
+    var state = ImeState.init();
+
+    // Type 한 using correct ohi.js indices
+    _ = processConsonant2Bulsik(&state, 30); // ㅎ
+    _ = processVowel2Bulsik(&state, 31); // ㅏ
+    _ = processConsonant2Bulsik(&state, 4); // ㄴ -> 한
+
+    // Type another consonant -> should emit 한, start new
+    const result = processConsonant2Bulsik(&state, 1); // ㄱ
+
+    try std.testing.expectEqual(@as(@TypeOf(result.action), .emit_and_new), result.action);
+    try std.testing.expectEqual(@as(u32, 0xD55C), result.prev_codepoint); // 한
+    try std.testing.expectEqual(@as(u32, 0x3131), result.current_codepoint); // ㄱ
+}
+
+test "backspace decomposition" {
+    var state = ImeState.init();
+
+    // Type 한 using correct ohi.js indices
+    _ = processConsonant2Bulsik(&state, 30); // ㅎ
+    _ = processVowel2Bulsik(&state, 31); // ㅏ
+    _ = processConsonant2Bulsik(&state, 4); // ㄴ
+
+    // Backspace: 한 → 하
+    const cp1 = processBackspace(&state).?;
+    try std.testing.expectEqual(@as(u32, 0xD558), cp1); // 하
+
+    // Backspace: 하 → ㅎ
+    const cp2 = processBackspace(&state).?;
+    try std.testing.expectEqual(@as(u32, 0x314E), cp2); // ㅎ
+
+    // Backspace: ㅎ → empty
+    const cp3 = processBackspace(&state);
+    try std.testing.expect(cp3 == null);
+    try std.testing.expect(state.isEmpty());
+}
+
+// ============================================================================
+// IME (Input Method Editor) Implementation
+// Based on ohi.js by Ho-Seok Ee
+// ============================================================================
+
+/// IME composition state - tracks in-progress syllable assembly
+/// Maps to ohi.js _q array: [initial, initial_flag, medial, medial_flag, final, final_flag]
+pub const ImeState = struct {
+    initial: i8, // 초성 index (0-19), -1 for special states
+    initial_flag: u8, // 0 or 1 (composition state)
+    medial: i8, // 중성 index (0-21), -1 for special states
+    medial_flag: u8, // 0 or 1
+    final: i8, // 종성 index (0-28, 0=no final), -1 for special states
+    final_flag: u8, // 0 or 1
+
+    pub fn init() ImeState {
+        return .{
+            .initial = 0,
+            .initial_flag = 0,
+            .medial = 0,
+            .medial_flag = 0,
+            .final = 0,
+            .final_flag = 0,
+        };
+    }
+
+    pub fn reset(self: *ImeState) void {
+        self.* = init();
+    }
+
+    pub fn isEmpty(self: ImeState) bool {
+        return self.initial <= 0 and self.medial <= 0 and self.final <= 0;
+    }
+
+    /// Convert state to complete syllable or single jamo
+    pub fn toCodepoint(self: ImeState) u32 {
+        // If have initial + medial, compose full syllable
+        if (self.initial > 0 and self.medial > 0) {
+            const cho_idx = ohiIndexToInitialIdx(self.initial);
+            const jung_idx = ohiIndexToMedialIdx(self.medial);
+            const jong_idx = ohiIndexToFinalIdx(self.final);
+
+            const cho = COMPAT_INITIAL[cho_idx];
+            const jung = COMPAT_MEDIAL[jung_idx];
+            const jong = if (jong_idx > 0) COMPAT_FINAL[jong_idx] else 0;
+
+            return compose(cho, jung, jong) orelse 0;
+        }
+
+        // Return single jamo using ohi.js formula: 0x3130 + index
+        if (self.initial > 0) return ohiIndexToSingleJamo(self.initial);
+        if (self.medial > 0) return ohiIndexToSingleJamo(self.medial);
+        if (self.final > 0) return ohiIndexToSingleJamo(self.final);
+
+        return 0;
+    }
+};
+
+/// Result from keystroke processing
+pub const KeyResult = struct {
+    action: enum { no_change, replace, emit_and_new },
+    prev_codepoint: u32, // Emit this first (if action=emit_and_new)
+    current_codepoint: u32, // Then emit/replace with this
+};
+
+/// 2-Bulsik (Dubeolsik) keyboard layout mapping
+/// Maps ASCII characters to jamo indices (1-based for compatibility with ohi.js logic)
+/// Index < 31 = consonant (can be initial or final)
+/// Index >= 31 = vowel (medial only)
+const LAYOUT_2BULSIK = [_]u8{
+    // Mapping from ohi.js lines 119-146
+    // r    R    t    T    s    e    E    f    a    q    Q    t    d    w    W    c    z
+    17, 1,  21, 2, 4, 7, 8, 9, 17, 18, 19, 21, 23, 24, 25, 26,
+    // x    v    g
+    27, 28, 29,
+    30,
+    // Shifted keys (uppercase)
+    // Vowels: k=ㅏ, o=ㅐ, i=ㅑ, O=ㅒ, j=ㅓ, p=ㅔ, u=ㅕ, P=ㅖ, h=ㅗ, hk=ㅘ, ho=ㅙ, hl=ㅚ
+    // y=ㅛ, n=ㅜ, nj=ㅝ, np=ㅞ, nl=ㅟ, b=ㅠ, m=ㅡ, ml=ㅢ, l=ㅣ
+};
+
+// Actual keyboard mapping following ohi.js (lines 119-146)
+// This maps ASCII code points to jamo indices
+fn mapKeycode2Bulsik(ascii: u8, shifted: bool) ?u8 {
+    // Based on ohi.js Array at lines 119-146
+    const lower_map = [26]u8{
+        // a    b    c    d    e    f    g    h    i    j    k    l    m
+        17, 48, 26, 23, 7, 9, 30, 39, 33, 35, 31, 51, 49,
+        // n    o    p    q    r    s    t    u    v    w    x    y    z
+        44, 32, 36, 18, 1, 4, 21, 37, 29, 24, 28, 43, 27,
+    };
+
+    const upper_map = [26]u8{
+        // A    B    C    D    E    F    G    H    I    J    K    L    M
+        17, 48, 26, 23, 8, 9, 30, 39, 33, 35, 31, 51, 49,
+        // N    O    P    Q    R    S    T    U    V    W    X    Y    Z
+        44, 34, 38, 18, 1, 6, 21, 37, 29, 24, 28, 43, 27,
+    };
+
+    if (ascii >= 'a' and ascii <= 'z') {
+        const idx = ascii - 'a';
+        return if (shifted) upper_map[idx] else lower_map[idx];
+    }
+    if (ascii >= 'A' and ascii <= 'Z') {
+        const idx = ascii - 'A';
+        return upper_map[idx];
+    }
+
+    return null;
+}
+
+/// Double jamo detection tables
+/// Based on ohi.js doubleJamo() lines 33-51
+const DoubleJamoType = enum { initial, medial, final };
+
+// Double initial: ㄱ+ㄱ=ㄲ, ㄷ+ㄷ=ㄸ, ㅂ+ㅂ=ㅃ, ㅅ+ㅅ=ㅆ, ㅈ+ㅈ=ㅉ
+const DOUBLE_INITIAL_SINGLES = [_]u8{ 1, 7, 18, 21, 24 }; // Indices in layout
+const DOUBLE_INITIAL_RESULT = [_]u8{ 2, 8, 19, 22, 25 }; // Resulting double
+
+// Double medial vowels - more complex (ohi.js lines 38-39)
+// ㅗ(8)+ㅏ(1)=ㅘ(9), ㅗ+ㅐ(2)=ㅙ(10), ㅗ+ㅣ(20)=ㅚ(11)
+// ㅜ(13)+ㅓ(5)=ㅝ(14), ㅜ+ㅔ(6)=ㅞ(15), ㅜ+ㅣ=ㅟ(16)
+// ㅡ(18)+ㅣ=ㅢ(19)
+const DoubleMedialMap = struct {
+    base: u8,
+    targets: []const u8,
+    results: []const u8,
+};
+
+const DOUBLE_MEDIAL_MAPS = [_]DoubleMedialMap{
+    .{ .base = 39, .targets = &[_]u8{ 31, 32, 51 }, .results = &[_]u8{ 40, 41, 42 } }, // ㅗ
+    .{ .base = 44, .targets = &[_]u8{ 35, 36, 51 }, .results = &[_]u8{ 45, 46, 47 } }, // ㅜ
+    .{ .base = 49, .targets = &[_]u8{51}, .results = &[_]u8{50} }, // ㅡ
+};
+
+// Double final consonants - ㄱ+ㅅ=ㄳ, ㄴ+ㅈ=ㄵ, ㄴ+ㅎ=ㄶ, etc. (ohi.js lines 40-46)
+const DoubleFinalMap = struct {
+    base: u8,
+    targets: []const u8,
+    results: []const u8,
+};
+
+const DOUBLE_FINAL_MAPS = [_]DoubleFinalMap{
+    .{ .base = 1, .targets = &[_]u8{19}, .results = &[_]u8{3} }, // ㄱ+ㅅ=ㄳ
+    .{ .base = 4, .targets = &[_]u8{ 22, 27 }, .results = &[_]u8{ 5, 6 } }, // ㄴ+ㅈ=ㄵ, ㄴ+ㅎ=ㄶ
+    .{ .base = 8, .targets = &[_]u8{ 1, 17, 18, 19, 25, 26, 27 }, .results = &[_]u8{ 9, 10, 11, 12, 13, 14, 15 } }, // ㄹ+...
+    .{ .base = 18, .targets = &[_]u8{19}, .results = &[_]u8{20} }, // ㅂ+ㅅ=ㅄ
+};
+
+/// Detect if current + incoming jamo can form double jamo
+/// Returns new compound index or 0 if cannot combine
+fn detectDoubleJamo(jamo_type: DoubleJamoType, current: u8, incoming: u8) u8 {
+    return switch (jamo_type) {
+        .initial => blk: {
+            for (DOUBLE_INITIAL_SINGLES, 0..) |single, i| {
+                if (current == single and incoming == single) {
+                    break :blk DOUBLE_INITIAL_RESULT[i];
+                }
+            }
+            break :blk 0;
+        },
+        .medial => blk: {
+            for (DOUBLE_MEDIAL_MAPS) |map| {
+                if (current == map.base) {
+                    for (map.targets, 0..) |target, i| {
+                        if (incoming == target) {
+                            break :blk map.results[i];
+                        }
+                    }
+                }
+            }
+            break :blk 0;
+        },
+        .final => blk: {
+            for (DOUBLE_FINAL_MAPS) |map| {
+                if (current == map.base) {
+                    for (map.targets, 0..) |target, i| {
+                        if (incoming == target) {
+                            break :blk map.results[i];
+                        }
+                    }
+                }
+            }
+            break :blk 0;
+        },
+    };
+}
+
+/// Process consonant keystroke in 2-Bulsik mode
+/// Based on ohi.js Hangul2() lines 152-176
+fn processConsonant2Bulsik(state: *ImeState, jamo_index: i8) KeyResult {
+    var result: KeyResult = .{
+        .action = .replace,
+        .prev_codepoint = 0,
+        .current_codepoint = 0,
+    };
+
+    const jamo_u8: u8 = @intCast(jamo_index);
+    var should_emit = false; // Track if we need to emit
+
+    // Scenario 1: Try adding as double final consonant
+    // Only try if final_flag == 0 (not already a double jamo)
+    if (state.medial > 0 and state.final > 0 and state.final_flag == 0) {
+        const double_idx = detectDoubleJamo(.final, @intCast(state.final), jamo_u8);
+        if (double_idx != 0) {
+            state.final = @intCast(double_idx);
+            state.final_flag = 1;
+            result.action = .replace;
+            result.current_codepoint = state.toCodepoint();
+            return result;
+        }
+        // Cannot double - will need to emit current syllable
+        should_emit = true;
+    }
+
+    // Scenario 2: Try double initial or start new syllable
+    // ohi.js lines 156-162
+    if (state.medial == 0 or
+        should_emit or
+        (state.initial > 0 and (state.final == 0 or state.final_flag == 0) and
+            (state.final > 0 or canFollowAsInitial(jamo_u8))))
+    {
+        // Try double initial
+        const double_idx = if (state.medial == 0 and state.final == 0 and state.initial > 0)
+            detectDoubleJamo(.initial, @intCast(state.initial), jamo_u8)
+        else
+            0;
+
+        if (double_idx != 0) {
+            state.initial = @intCast(double_idx);
+            state.initial_flag = 1;
+            result.action = .replace;
+            result.current_codepoint = state.toCodepoint();
+        } else {
+            // Emit previous syllable, start new
+            if (!state.isEmpty()) {
+                result.action = .emit_and_new;
+                result.prev_codepoint = state.toCodepoint();
+            }
+            state.reset();
+            state.initial = jamo_index;
+            state.initial_flag = 1;
+            result.current_codepoint = state.toCodepoint();
+        }
+    }
+    // Scenario 3: Add as initial (if empty) or final (if have medial)
+    else {
+        if (state.initial == 0) {
+            state.initial = jamo_index;
+            state.initial_flag = 1;
+        } else if (state.final == 0) {
+            state.final = jamo_index;
+            state.final_flag = 0;
+        }
+        result.action = .replace;
+        result.current_codepoint = state.toCodepoint();
+    }
+
+    return result;
+}
+
+/// Some consonants can follow initial without medial
+/// ohi.js line 161: c == 8 || c == 19 || c == 25
+fn canFollowAsInitial(jamo_index: u8) bool {
+    return jamo_index == 8 or jamo_index == 19 or jamo_index == 25;
+}
+
+/// Process vowel keystroke in 2-Bulsik mode
+/// Based on ohi.js Hangul2() lines 177-199
+fn processVowel2Bulsik(state: *ImeState, jamo_index: i8) KeyResult {
+    var result: KeyResult = .{
+        .action = .replace,
+        .prev_codepoint = 0,
+        .current_codepoint = 0,
+    };
+
+    const jamo_u8: u8 = @intCast(jamo_index);
+
+    // Scenario 1: Try adding as double medial
+    // Only try if medial_flag == 0 (not already a double jamo)
+    if (state.medial > 0 and state.final == 0 and state.medial_flag == 0) {
+        const double_idx = detectDoubleJamo(.medial, @intCast(state.medial), jamo_u8);
+        if (double_idx != 0) {
+            state.medial = @intCast(double_idx);
+            state.medial_flag = 1;
+            result.action = .replace;
+            result.current_codepoint = state.toCodepoint();
+            return result;
+        }
+        // Cannot double
+        state.medial = -1;
+    }
+
+    // Scenario 2: Syllable splitting
+    if (state.initial > 0 and state.medial > 0 and state.final > 0) {
+        // Emit current syllable without final
+        const temp_final = state.final;
+        state.final = 0;
+        result.action = .emit_and_new;
+        result.prev_codepoint = state.toCodepoint();
+
+        // Start new syllable with old final as initial
+        state.reset();
+        state.initial = temp_final;
+        state.medial = jamo_index;
+        state.initial_flag = 0;
+        state.medial_flag = 0;
+        result.current_codepoint = state.toCodepoint();
+        return result;
+    }
+
+    // Scenario 3: Start new syllable or add to existing
+    if ((state.initial == 0 or state.medial > 0) or state.medial < 0) {
+        // Start new syllable with just vowel
+        if (!state.isEmpty()) {
+            result.action = .emit_and_new;
+            result.prev_codepoint = state.toCodepoint();
+        }
+        state.reset();
+        state.medial = jamo_index;
+        result.current_codepoint = state.toCodepoint();
+    } else {
+        // Add medial to existing initial
+        state.medial = jamo_index;
+        state.medial_flag = 0;
+        result.action = .replace;
+        result.current_codepoint = state.toCodepoint();
+    }
+
+    return result;
+}
+
+/// Process backspace - decomposes syllable step by step
+/// Based on ohi.js keydownHandler() lines 418-427
+fn processBackspace(state: *ImeState) ?u32 {
+    // Find rightmost non-zero component and remove it
+    // Order: final → medial → initial (flags are cleared with their components)
+    if (state.final > 0) {
+        state.final = 0;
+        state.final_flag = 0;
+        return state.toCodepoint();
+    }
+    if (state.medial > 0) {
+        state.medial = 0;
+        state.medial_flag = 0;
+        return state.toCodepoint();
+    }
+    if (state.initial > 0) {
+        state.initial = 0;
+        state.initial_flag = 0;
+        return null; // State now empty - let browser handle deletion
+    }
+
+    return null; // Already empty
 }
 
 // Build configuration comment:

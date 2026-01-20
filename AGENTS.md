@@ -222,11 +222,18 @@ Proper bounds checking on continuation bytes is critical.
 
 # OUT OF SCOPE / ANTI-PATTERNS
 
-- Implementing keyboard input method handling (Dubeol vs. Sebeol)
 - Adding advanced search or pattern matching without clear use cases
-- Storing mutable state in the library
 - Using unsafe code blocks without clear justification and comments
 - Panicking on invalid input (use optional returns instead)
+
+## IME-Specific Guidelines (Now In Scope)
+
+As of the ohi.js port, keyboard input method handling (Dubeol/Sebeol) is **now in scope**:
+
+- **State Management**: IME instances maintain composition state (mutable per-instance)
+- **Memory Allocation**: Each IME instance allocated separately via `wasm_ime_create()`
+- **Stateless Core**: Decompose/compose functions remain stateless; only IME has state
+- **Modern Browsers Only**: No legacy IE/old Firefox support (use modern DOM APIs)
 
 # DOCUMENTATION CONVENTION
 

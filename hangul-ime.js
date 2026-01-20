@@ -35,8 +35,8 @@ export class HangulIme {
         this.memory = wasmModule.instance.exports.memory;
         this.handle = this.wasm.wasm_ime_create();
         this.enabled = false;
-        this.spaceJustPressed = false; // Flag to prevent keypress after space
         this.hasComposition = false; // Track if there's an active composition
+        this.compositionStart = -1; // Track where composition started in the text field
         this.keySequence = []; // Track keys pressed for current syllable
         this.debug = options.debug !== undefined ? options.debug : DEBUG;
         
@@ -89,6 +89,7 @@ export class HangulIme {
     reset() {
         this.wasm.wasm_ime_reset(this.handle);
         this.hasComposition = false;
+        this.compositionStart = -1;
         this.keySequence = [];
         // this.updateOverlay(); // DISABLED
     }
@@ -146,22 +147,11 @@ export class HangulIme {
     handleKeyPress(event, field) {
         if (!this.enabled) return false;
         
-        // Skip space keypress event if we already handled it in keydown
-        if (this.spaceJustPressed && event.key === ' ') {
-            this.spaceJustPressed = false;
-            if (this.debug) {
-                console.log('[HangulIme] Skipping space keypress handler (already handled in keydown)');
-            }
-            return true; // Prevent this event
-        }
-        
-        // Clear the flag if any other key was pressed
-        if (this.spaceJustPressed) {
-            this.spaceJustPressed = false;
-        }
-        
-        // Only handle printable single characters
+        // Only handle printable single characters (not space, enter, etc.)
         if (event.key.length !== 1) return false;
+        
+        // Don't intercept space - let browser handle it
+        if (event.key === ' ') return false;
         
         const char = event.key;
         const jamoIndex = LAYOUT_2BULSIK[char];
@@ -203,9 +193,14 @@ export class HangulIme {
             case ACTION_REPLACE:
                 // Replace the last character with the new composition
                 // Only replace if we have an active composition, otherwise insert
-                if (this.hasComposition) {
-                    this.replaceLastChar(field, currentCodepoint);
+                if (this.debug) {
+                    console.log(`[HangulIme] ACTION_REPLACE: hasComposition=${this.hasComposition}, compositionStart=${this.compositionStart}`);
+                }
+                if (this.hasComposition && this.compositionStart >= 0) {
+                    this.replaceComposition(field, currentCodepoint);
                 } else {
+                    // Starting new composition
+                    this.compositionStart = field.selectionStart;
                     this.insertChar(field, currentCodepoint);
                 }
                 this.hasComposition = true;
@@ -214,11 +209,16 @@ export class HangulIme {
             case ACTION_EMIT_AND_NEW:
                 // Emit the previous syllable (replace current char with prev)
                 // Then insert the new syllable
-                if (prevCodepoint !== 0) {
-                    // Replace the current character (엉) with the emitted one (어)
-                    this.replaceLastChar(field, prevCodepoint);
+                if (this.debug) {
+                    console.log(`[HangulIme] ACTION_EMIT_AND_NEW: prev=${String.fromCodePoint(prevCodepoint)}, current=${String.fromCodePoint(currentCodepoint)}, compositionStart=${this.compositionStart}`);
                 }
-                // Then insert the new character (요)
+                if (prevCodepoint !== 0 && this.hasComposition && this.compositionStart >= 0) {
+                    // Replace the current composition with the emitted syllable
+                    this.replaceComposition(field, prevCodepoint);
+                }
+                // Start new composition at the next position
+                this.compositionStart = this.compositionStart >= 0 ? this.compositionStart + 1 : field.selectionStart;
+                // Insert the new character
                 this.insertChar(field, currentCodepoint);
                 this.hasComposition = true;
                 break;
@@ -243,11 +243,31 @@ export class HangulIme {
     handleBackspace(field) {
         if (!this.enabled) return false;
         
+        if (this.debug) {
+            console.log(`[HangulIme] Backspace: hasComposition=${this.hasComposition}, compositionStart=${this.compositionStart}, cursor=${field.selectionStart}, value="${field.value}"`);
+        }
+        
+        // If no active composition, let browser handle
+        if (!this.hasComposition || this.compositionStart < 0) {
+            if (this.debug) {
+                console.log(`[HangulIme]   → No active composition, letting browser handle`);
+            }
+            return false;
+        }
+        
         const newCodepoint = this.wasm.wasm_ime_backspace(this.handle);
         
+        if (this.debug) {
+            console.log(`[HangulIme]   → WASM backspace returned: U+${newCodepoint.toString(16).toUpperCase().padStart(4, '0')} (${newCodepoint !== 0 ? String.fromCodePoint(newCodepoint) : 'empty'})`);
+        }
+        
         if (newCodepoint !== 0) {
-            // Replace last character with decomposed version
-            this.replaceLastChar(field, newCodepoint);
+            // Replace composition character with decomposed version
+            this.replaceComposition(field, newCodepoint);
+            
+            if (this.debug) {
+                console.log(`[HangulIme]   → After replace: cursor=${field.selectionStart}, value="${field.value}"`);
+            }
             
             // Remove last key from sequence
             if (this.keySequence.length > 0) {
@@ -258,10 +278,64 @@ export class HangulIme {
             return true;
         }
         
-        // newCodepoint === 0: IME state is empty, let browser handle normally
+        // newCodepoint === 0: IME state is empty
+        // Delete the composition character and reset
+        if (this.debug) {
+            console.log(`[HangulIme]   → IME empty, deleting composition at ${this.compositionStart}`);
+        }
+        
+        const pos = this.compositionStart;
+        if (pos >= 0 && pos < field.value.length) {
+            field.value = 
+                field.value.slice(0, pos) + 
+                field.value.slice(pos + 1);
+            field.selectionStart = field.selectionEnd = pos;
+        }
+        
+        this.hasComposition = false;
+        this.compositionStart = -1;
         this.keySequence = [];
         // this.updateOverlay(); // DISABLED
-        return false;
+        return true; // We handled it by deleting the composition
+    }
+    
+    /**
+     * Replace the composition character at the tracked position
+     * Uses compositionStart to know exactly where to replace
+     */
+    replaceComposition(field, codepoint) {
+        const char = String.fromCodePoint(codepoint);
+        const pos = this.compositionStart;
+        
+        if (this.debug) {
+            console.log(`[HangulIme] replaceComposition: '${char}' at compositionStart=${pos}, value="${field.value}"`);
+            if (pos >= 0 && pos < field.value.length) {
+                console.log(`[HangulIme]   → Replacing char at index ${pos}: '${field.value[pos]}'`);
+            }
+        }
+        
+        if (pos < 0 || pos >= field.value.length) {
+            // Invalid position, fall back to insert
+            if (this.debug) {
+                console.log(`[HangulIme]   → Invalid position, falling back to insert`);
+            }
+            this.compositionStart = field.selectionStart;
+            this.insertChar(field, codepoint);
+            return;
+        }
+        
+        // Replace character at compositionStart
+        field.value = 
+            field.value.slice(0, pos) + 
+            char + 
+            field.value.slice(pos + 1);
+        
+        // Set cursor after the composition
+        field.selectionStart = field.selectionEnd = pos + 1;
+        
+        if (this.debug) {
+            console.log(`[HangulIme]   → After replace: cursor=${field.selectionStart}, value="${field.value}"`);
+        }
     }
     
     /**
@@ -272,12 +346,20 @@ export class HangulIme {
         const start = field.selectionStart;
         const end = field.selectionEnd;
         
+        if (this.debug) {
+            console.log(`[HangulIme] insertChar: '${char}' at cursor=${start}, value="${field.value}"`);
+        }
+        
         field.value = 
             field.value.slice(0, start) + 
             char + 
             field.value.slice(end);
         
         field.selectionStart = field.selectionEnd = start + char.length;
+        
+        if (this.debug) {
+            console.log(`[HangulIme]   → After insert: cursor=${field.selectionStart}, value="${field.value}"`);
+        }
     }
     
     /**
@@ -286,6 +368,13 @@ export class HangulIme {
     replaceLastChar(field, codepoint) {
         const char = String.fromCodePoint(codepoint);
         const start = field.selectionStart;
+        
+        if (this.debug) {
+            console.log(`[HangulIme] replaceLastChar: '${char}' at cursor=${start}, value="${field.value}"`);
+            if (start > 0) {
+                console.log(`[HangulIme]   → Replacing char at index ${start-1}: '${field.value[start-1]}'`);
+            }
+        }
         
         if (start === 0) {
             // Nothing to replace, just insert
@@ -299,6 +388,10 @@ export class HangulIme {
             field.value.slice(start);
         
         field.selectionStart = field.selectionEnd = start;
+        
+        if (this.debug) {
+            console.log(`[HangulIme]   → After replace: cursor=${field.selectionStart}, value="${field.value}"`);
+        }
     }
     
     /**
@@ -343,19 +436,13 @@ export function setupIme(wasmModule, fieldSelector = 'input[type="text"], textar
             }
         } else if (e.key === ' ') {
             // Space finalizes current composition and resets IME
-            if (ime.isEnabled()) {
+            // Let the browser handle the actual space insertion naturally
+            if (ime.isEnabled() && ime.hasComposition) {
                 if (ime.debug) {
-                    console.log('[HangulIme] Space key detected, resetting IME and inserting space');
+                    console.log('[HangulIme] Space key detected, finalizing composition');
                 }
                 ime.reset();
-                ime.spaceJustPressed = true; // Set flag to skip keypress handler
-                // Manually insert space since we need to handle it
-                const field = e.target;
-                const start = field.selectionStart;
-                const end = field.selectionEnd;
-                field.value = field.value.slice(0, start) + ' ' + field.value.slice(end);
-                field.selectionStart = field.selectionEnd = start + 1;
-                e.preventDefault(); // Prevent default space handling
+                // Don't preventDefault - let browser insert space naturally
             }
         } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || 
                    e.key === 'ArrowUp' || e.key === 'ArrowDown' ||

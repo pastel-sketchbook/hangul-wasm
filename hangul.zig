@@ -732,6 +732,68 @@ test "backspace decomposition" {
     try std.testing.expect(state.isEmpty());
 }
 
+test "typing 입력할 then backspace should decompose 할" {
+    // This test simulates the exact user scenario:
+    // Type "입력할" (dlq + fur + gkf in 2-bulsik layout)
+    // Then press backspace - should decompose 할 → 하
+    var state = ImeState.init();
+
+    // Type 입: d(ㅇ=23) + l(ㅣ=51) + q(ㅂ=18)
+    const r1 = processConsonant2Bulsik(&state, 23); // ㅇ
+    try std.testing.expectEqual(.replace, r1.action);
+
+    const r2 = processVowel2Bulsik(&state, 51); // ㅣ
+    try std.testing.expectEqual(.replace, r2.action);
+    try std.testing.expectEqual(@as(u32, 0xC774), r2.current_codepoint); // 이
+
+    const r3 = processConsonant2Bulsik(&state, 18); // ㅂ
+    try std.testing.expectEqual(.replace, r3.action);
+    try std.testing.expectEqual(@as(u32, 0xC785), r3.current_codepoint); // 입
+
+    // Type 력: f(ㄹ=9) + u(ㅕ=37) + r(ㄱ=1)
+    const r4 = processConsonant2Bulsik(&state, 9); // ㄹ - should emit 입 and start new
+    try std.testing.expectEqual(.emit_and_new, r4.action);
+    try std.testing.expectEqual(@as(u32, 0xC785), r4.prev_codepoint); // 입
+    try std.testing.expectEqual(@as(u32, 0x3139), r4.current_codepoint); // ㄹ (single jamo)
+
+    const r5 = processVowel2Bulsik(&state, 37); // ㅕ
+    try std.testing.expectEqual(.replace, r5.action);
+    try std.testing.expectEqual(@as(u32, 0xB824), r5.current_codepoint); // 려
+
+    const r6 = processConsonant2Bulsik(&state, 1); // ㄱ
+    try std.testing.expectEqual(.replace, r6.action);
+    try std.testing.expectEqual(@as(u32, 0xB825), r6.current_codepoint); // 력
+
+    // Type 할: g(ㅎ=30) + k(ㅏ=31) + f(ㄹ=9)
+    const r7 = processConsonant2Bulsik(&state, 30); // ㅎ - should emit 력 and start new
+    try std.testing.expectEqual(.emit_and_new, r7.action);
+    try std.testing.expectEqual(@as(u32, 0xB825), r7.prev_codepoint); // 력
+    try std.testing.expectEqual(@as(u32, 0x314E), r7.current_codepoint); // ㅎ (single jamo)
+
+    const r8 = processVowel2Bulsik(&state, 31); // ㅏ
+    try std.testing.expectEqual(.replace, r8.action);
+    try std.testing.expectEqual(@as(u32, 0xD558), r8.current_codepoint); // 하
+
+    const r9 = processConsonant2Bulsik(&state, 9); // ㄹ
+    try std.testing.expectEqual(.replace, r9.action);
+    try std.testing.expectEqual(@as(u32, 0xD560), r9.current_codepoint); // 할
+
+    // Now verify state before backspace
+    try std.testing.expectEqual(@as(i8, 30), state.initial); // ㅎ
+    try std.testing.expectEqual(@as(i8, 31), state.medial); // ㅏ
+    try std.testing.expectEqual(@as(i8, 9), state.final); // ㄹ
+
+    // Backspace: 할 → 하
+    const bs1 = processBackspace(&state);
+    try std.testing.expect(bs1 != null);
+    try std.testing.expectEqual(@as(u32, 0xD558), bs1.?); // 하
+
+    // Verify state after first backspace
+    try std.testing.expectEqual(@as(i8, 30), state.initial); // ㅎ
+    try std.testing.expectEqual(@as(i8, 31), state.medial); // ㅏ
+    try std.testing.expectEqual(@as(i8, 0), state.final); // no final
+}
+
 // ============================================================================
 // IME (Input Method Editor) Implementation
 // Based on ohi.js by Ho-Seok Ee

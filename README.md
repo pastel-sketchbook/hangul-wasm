@@ -556,11 +556,26 @@ task clean            # Remove build artifacts
 
 This project is a Zig/WebAssembly port of [**hangul.js**](https://github.com/kwseok/hangul.js) by [kwseok](https://github.com/kwseok). The original library provided the algorithmic foundation and API design that informed this implementation.
 
-**ohi.js** ([Ho-Seok Ee](https://gist.github.com/channy/5943520)) - Korean IME implementation that inspired the design analysis in [docs/rationale/0002_ohi_js_ime_port_strategy.md](./docs/rationale/0002_ohi_js_ime_port_strategy.md). The original ohi.js provides browser-based Korean input method functionality for Dubeolsik (2-bulsik) and Sebeolsik (3-bulsik) keyboard layouts.
+**ohi.js** ([Ho-Seok Ee](https://gist.github.com/channy/5943520)) - This project contains a direct port of ohi.js, which provides the Korean IME (Input Method Editor) implementation. More than half of this codebase consists of direct ports and derivative works from ohi.js. The original ohi.js provides browser-based Korean input method functionality for Dubeolsik (2-bulsik) and Sebeolsik (3-bulsik) keyboard layouts.
 
 ## License
 
-MIT
+**GNU General Public License v2.0 or later (GPL-2.0-or-later)**
+
+This project is licensed under the GNU General Public License v2 or later, as required by its dependency on and derivation from ohi.js.
+
+**Original Work:**
+- **ohi.js** by Ho-Seok Ee <hsee@korea.ac.kr>
+- Copyright (C) Ho-Seok Ee
+- Licensed under GPL v2 or later
+
+**This Project (hangul-wasm):**
+- Copyright (C) 2026 Pastel Sketchbook Project
+- Licensed under GPL v2 or later
+
+Since more than half of this codebase consists of direct ports and derivative works from ohi.js (which is GPL v2 licensed), this entire project must be distributed under the GNU General Public License v2 or later.
+
+See the [LICENSE](./LICENSE) file for the complete license text.
 
 ## References
 

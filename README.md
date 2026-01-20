@@ -8,6 +8,48 @@ A high-performance WebAssembly library for Korean text processing, implemented i
 
 This is a Zig-based implementation of Korean text processing functionality, compiled to WebAssembly for optimal performance. The original JavaScript library by kwseok provides utilities for decomposing and composing Korean syllables. This port brings those capabilities to WASM while maintaining API compatibility.
 
+## Architecture
+
+This library uses a **hybrid WASM + JavaScript architecture**:
+
+### Core Logic (WASM - `hangul.wasm`)
+**What it does:**
+- **Korean text algorithms**: Decomposition, composition, syllable validation
+- **IME state machine**: Tracks jamo composition state and handles syllable splitting
+- **Memory management**: Efficient allocation for buffer operations
+
+**Why WASM:**
+- **Performance**: O(1) algorithmic operations compiled to native code
+- **Size**: 4.3KB optimized binary (vs ~50KB JavaScript equivalent)
+- **Type safety**: Zig's compile-time guarantees prevent runtime errors
+
+### UI Integration Layer (JavaScript - `hangul-ime.js`)
+**What it does:**
+- **Keyboard event handling**: Captures keypresses, maps keys to jamo indices
+- **DOM manipulation**: Inserts/replaces text in input fields
+- **Browser API integration**: Selection ranges, focus management, event coordination
+- **Layout mapping**: Converts QWERTY keys to 2-Bulsik Korean layout
+
+**Why JavaScript:**
+- **DOM access**: WASM cannot directly access browser APIs or modify HTML elements
+- **Event system**: Browser events (keypress, keydown, focus) are JavaScript-only
+- **Async coordination**: Managing multiple input fields and state requires JS event loop
+- **Debugging**: Runtime inspection and console logging for developer experience
+
+### Division of Responsibility
+
+```
+User types "g" on keyboard
+         ↓
+[JavaScript] Captures keypress event → Maps 'g' to jamo index 0 (ㅎ)
+         ↓
+[WASM] Processes jamo index → Returns composed syllable or action code
+         ↓
+[JavaScript] Receives result → Updates DOM with Korean character
+```
+
+**Both are required:** WASM provides the algorithmic core, JavaScript provides the browser integration. This separation keeps the WASM module small and reusable across different UI frameworks.
+
 ## Features
 
 ### Core Functions
@@ -28,6 +70,23 @@ Core Functions:
 **Memory management:**
 - **`wasm_alloc(size: u32) -> u32`**: Allocate WASM memory; returns byte offset (0 on failure)
 - **`wasm_free(ptr: u32, size: u32) -> void`**: Deallocate WASM memory (no-op in current implementation)
+
+**IME (Input Method Editor) Functions:**
+- **`wasm_ime_create() -> u32`**: Create IME instance; returns handle (0 on failure)
+- **`wasm_ime_destroy(handle: u32) -> void`**: Destroy IME instance and free resources
+- **`wasm_ime_reset(handle: u32) -> void`**: Reset IME composition state
+- **`wasm_ime_processKey(handle: u32, jamo_index: i8, result_ptr: u32) -> bool`**: Process keystroke; writes action/codepoints to result buffer (12 bytes)
+- **`wasm_ime_backspace(handle: u32) -> u32`**: Process backspace; returns updated codepoint (0 if empty)
+- **`wasm_ime_getState(handle: u32, output_ptr: u32) -> void`**: Get current state for debugging (6 bytes: initial, initial_flag, medial, medial_flag, final, final_flag)
+
+### IME Features
+
+- **2-Bulsik (Dubeolsik) Keyboard Layout**: Standard Korean keyboard layout
+- **Real-time Composition**: Convert keystrokes into Hangul syllables as you type
+- **Double Jamo Support**: Automatic handling of ㄲ, ㄸ, ㅃ, ㅆ, ㅉ (consonants) and ㅘ, ㅝ, ㅢ, etc. (vowels)
+- **Syllable Splitting**: Intelligently splits syllables when needed (e.g., typing 한 + ㅏ → 하 + ㄴㅏ)
+- **Backspace Decomposition**: Step-by-step decomposition (한 → 하 → ㅎ → ∅)
+- **Stateful Processing**: Maintains composition buffer for complex input sequences
 
 ### Technical Highlights
 
@@ -217,6 +276,90 @@ if (bufPtr !== 0 && hangul.wasm_decompose(0xD55C, bufPtr)) {
 }
 ```
 
+### IME (Input Method Editor) Usage
+
+```javascript
+import { HangulIme, setupIme } from './hangul-ime.js';
+
+// Load WASM module with IME support
+async function initializeIme() {
+  const response = await fetch('hangul.wasm');
+  const buffer = await response.arrayBuffer();
+  
+  const memory = new WebAssembly.Memory({ initial: 256, maximum: 512 });
+  const imports = { 
+    env: { 
+      __linear_memory: memory,
+      __stack_pointer: new WebAssembly.Global({ value: 'i32', mutable: true }, 0),
+      __indirect_function_table: new WebAssembly.Table({ initial: 128, element: 'anyfunc' })
+    } 
+  };
+  
+  const wasmModule = await WebAssembly.instantiate(buffer, imports);
+  
+  // Method 1: Automatic setup for all input/textarea elements
+  const ime = setupIme(wasmModule);
+  ime.enable();
+  
+  // Method 2: Manual setup for specific fields
+  const ime2 = new HangulIme(wasmModule);
+  
+  document.addEventListener('keypress', (e) => {
+    if (e.target.matches('#myKoreanInput')) {
+      if (ime2.handleKeyPress(e, e.target)) {
+        e.preventDefault();
+      }
+    }
+  });
+  
+  document.addEventListener('keydown', (e) => {
+    if (e.target.matches('#myKoreanInput') && e.key === 'Backspace') {
+      if (ime2.handleBackspace(e.target)) {
+        e.preventDefault();
+      }
+    }
+    
+    // Toggle IME with Shift+Space
+    if (e.shiftKey && e.code === 'Space') {
+      e.preventDefault();
+      ime2.isEnabled() ? ime2.disable() : ime2.enable();
+    }
+  });
+}
+
+// Example keyboard mappings (2-Bulsik layout):
+// r → ㄱ, rr → ㄲ
+// k → ㅏ, h → ㅗ, hk → ㅘ (auto-combination)
+// Type "gksrmf" → 한글
+// Type "dkssud" → 안녕
+
+// Backspace behavior:
+// 한 (backspace) → 하 (backspace) → ㅎ (backspace) → (empty)
+```
+
+### Debug Mode
+
+Enable debug logging to see keypress events and IME state changes in the browser console:
+
+**Via UI:** Click the "Debug: OFF/ON" button in the IME section
+
+**Via Keyboard:** Press Ctrl+Shift+D to toggle debug mode
+
+**Via Taskfile:**
+```bash
+task debug:enable      # Enable debug logging in hangul-ime.js
+task debug:disable     # Disable debug logging in hangul-ime.js
+task run:demo:debug    # Run demo with debug enabled (auto-disables after)
+```
+
+Debug logs are prefixed with `[HangulIme]` for easy console filtering. Example output:
+```
+[HangulIme] Key pressed: g (ㅎ) - initial consonant (index 0)
+[HangulIme] WASM result: action=REPLACE, current=ㅎ (0x314E)
+[HangulIme] Key pressed: k (ㅏ) - medial vowel (index 0)
+[HangulIme] WASM result: action=REPLACE, current=하 (0xD558)
+```
+
 ## Interactive Demo
 
 An HTML demo (`index.html`) is included with:
@@ -225,6 +368,7 @@ An HTML demo (`index.html`) is included with:
 - **Composition Tool**: Combine jamo to create syllables
 - **Property Checker**: Inspect individual character properties
 - **String Processor**: Decompose entire Korean text
+- **한글 IME**: Type Korean using standard QWERTY keyboard with 2-Bulsik layout (toggle with Shift+Space)
 
 <img src="screenshot.png" alt="hangul-wasm Demo" width="100%" />
 

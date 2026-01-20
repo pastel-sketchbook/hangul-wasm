@@ -232,3 +232,38 @@ tasks:
         echo ""
         echo "Total files:"
         ls -1 | wc -l
+
+  debug:enable:
+    desc: Enable debug logging in hangul-ime.js
+    cmds:
+      - |
+        if grep -q "let DEBUG = false" hangul-ime.js; then
+          sed -i.bak 's/let DEBUG = false/let DEBUG = true/' hangul-ime.js
+          rm -f hangul-ime.js.bak
+          echo "Debug mode enabled in hangul-ime.js"
+        elif grep -q "let DEBUG = true" hangul-ime.js; then
+          echo "Debug mode already enabled"
+        else
+          echo "Warning: DEBUG flag not found in expected format"
+        fi
+
+  debug:disable:
+    desc: Disable debug logging in hangul-ime.js
+    cmds:
+      - |
+        if grep -q "let DEBUG = true" hangul-ime.js; then
+          sed -i.bak 's/let DEBUG = true/let DEBUG = false/' hangul-ime.js
+          rm -f hangul-ime.js.bak
+          echo "Debug mode disabled in hangul-ime.js"
+        elif grep -q "let DEBUG = false" hangul-ime.js; then
+          echo "Debug mode already disabled"
+        else
+          echo "Warning: DEBUG flag not found in expected format"
+        fi
+
+  run:demo:debug:
+    desc: Run demo with debug logging enabled
+    cmds:
+      - task: debug:enable
+      - task: run:demo
+      - defer: { task: debug:disable }

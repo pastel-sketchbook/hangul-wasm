@@ -375,17 +375,166 @@
         color: var(--text-light);
         font-style: italic;
       }
+
+      /* IME Indicator */
+      .ime-indicator {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        background: linear-gradient(135deg, var(--primary) 0%, #d4a5d4 100%);
+        color: white;
+        padding: 0.75rem 1.25rem;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        box-shadow: 0 8px 24px rgba(212, 165, 212, 0.4);
+        display: none;
+        align-items: center;
+        gap: 0.5rem;
+        z-index: 1000;
+        transition: all 0.3s ease;
+      }
+
+      .ime-indicator.active {
+        display: flex;
+        animation: slideInUp 0.3s ease;
+      }
+
+      .ime-indicator .status-dot {
+        width: 8px;
+        height: 8px;
+        background: #b8d9c1;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes slideInUp {
+        from {
+          transform: translateY(100px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+
+      /* Highlight textarea when IME is active */
+      #imeInput.ime-active {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(212, 165, 212, 0.15);
+      }
     </style>
   </head>
   <body>
-    <div class="container">
-      <!-- Header -->
-      <div class="header">
-        <h1>hangul-wasm</h1>
-        <div class="subtitle">High-performance Korean text processing</div>
-        <div class="version-badge">Zig/WebAssembly</div>
-        <div id="status" class="status loading">Loading WASM module...</div>
-      </div>
+      <div class="container">
+        <!-- Header -->
+        <div class="header">
+          <h1 class="title">hangul.wasm</h1>
+          <div class="subtitle">
+            Korean text processing in WebAssembly
+          </div>
+          <div id="status" class="status loading">Loading...</div>
+        </div>
+
+        <!-- IME Section -->
+        <div class="demo-section" id="imeSection" style="display: none;">
+          <div class="section-header">
+            <div class="section-icon">
+              <svg viewBox="0 0 24 24">
+                <path d="M4 7V4h16v3M9 20h6M12 4v16" stroke="currentColor" />
+              </svg>
+            </div>
+            <h2>한글 IME (Input Method Editor)</h2>
+          </div>
+          <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+            <button id="imeToggle" onclick="toggleIme()" style="width: auto; margin: 0; padding: 0.75rem 1.5rem; font-size: 0.9rem;">
+              Enable IME
+            </button>
+            <button id="debugToggle" onclick="toggleDebug()" style="width: auto; margin: 0; padding: 0.75rem 1.5rem; font-size: 0.9rem; background: var(--text-light); color: white;">
+              Debug: OFF
+            </button>
+            <span id="imeStatus" style="font-weight: 600; color: var(--text-light);">
+              Press <kbd style="background: #e8e8f0; padding: 0.25rem 0.5rem; border-radius: 4px; font-family: monospace;">Shift+Space</kbd> to toggle
+            </span>
+          </div>
+          <label class="label">Type Korean using 2-Bulsik (Dubeolsik) layout:</label>
+          <textarea
+            id="imeInput"
+            placeholder="Try: gksrmf (한글), dkssud (안녕)"
+            style="min-height: 150px; font-size: 1.2rem;"
+          ></textarea>
+          
+          <!-- Composition Overlay - DISABLED for now -->
+          <!--
+          <div id="compositionOverlay" style="
+            margin-top: 1rem;
+            padding: 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            color: white;
+            font-family: monospace;
+            display: none;
+          ">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-size: 0.75rem; opacity: 0.9; margin-bottom: 0.25rem;">Keys pressed:</div>
+                <div id="keysPressed" style="font-size: 1.1rem; font-weight: 600; letter-spacing: 0.1em;">—</div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 0.75rem; opacity: 0.9; margin-bottom: 0.25rem;">Current composition:</div>
+                <div id="currentComposition" style="font-size: 2rem; font-weight: 700;">—</div>
+              </div>
+            </div>
+          </div>
+          -->
+          
+          <div class="info">
+            <strong>Standard 2-Bulsik (Dubeolsik) Layout:</strong><br>
+            This is the authentic Korean keyboard layout used in Korea.<br>
+            <br>
+            <strong>Consonants (left hand):</strong><br>
+            q(ㅂ) w(ㅈ) e(ㄷ) r(ㄱ) t(ㅅ) / a(ㅁ) s(ㄴ) d(ㅇ) f(ㄹ) g(ㅎ) / z(ㅋ) x(ㅌ) c(ㅊ) v(ㅍ)<br>
+            <br>
+            <strong>Vowels (right hand):</strong><br>
+            y(ㅛ) u(ㅕ) i(ㅑ) o(ㅐ) p(ㅔ) / h(ㅗ) j(ㅓ) k(ㅏ) l(ㅣ) / b(ㅠ) n(ㅜ) m(ㅡ)<br>
+            <br>
+            <strong>Double consonants (Shift):</strong><br>
+            Q(ㅃ) W(ㅉ) E(ㄸ) R(ㄲ) T(ㅆ)<br>
+            <br>
+            <strong>Examples:</strong><br>
+            • <code>gksrmf</code> → 한글 (Korean)<br>
+            • <code>dkssud</code> → 안녕 (hello)<br>
+            • <code>Rkr</code> → 까 (double ㄱ + ㅏ)<br>
+            <br>
+            • Backspace decomposes syllables step-by-step (한 → 하 → ㅎ)<br>
+            • Compound vowels form automatically (ㅗ+ㅏ → ㅘ, ㅜ+ㅓ → ㅝ)
+          </div>
+          <div id="imeDebug" style="margin-top: 1rem; padding: 1rem; background: #f8f8fa; border-radius: 8px; font-family: monospace; font-size: 0.85rem; color: var(--text-light); display: none;">
+            <div>State: <span id="imeStateDisplay">—</span></div>
+          </div>
+        </div>
+
+        <!-- Decompose Section -->
+        <div class="demo-section">
+          <div class="section-header">
+            <div class="section-icon">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M3 12h18M12 3v18"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  fill="none"
+                />
+              </svg>
+            </div>
+            <h2>Decompose (Syllable → Jamo)</h2>
+          </div>
 
       <!-- Content -->
       <div class="content">
@@ -521,6 +670,13 @@
           <a href="https://github.com/pastel-sketchbook/hangul-wasm">Source Code</a>
         </p>
       </div>
+    </div>
+
+    <!-- IME Floating Indicator -->
+    <div id="imeIndicator" class="ime-indicator">
+      <span class="status-dot"></span>
+      <span>한글 IME Active</span>
+      <kbd style="background: rgba(255,255,255,0.2); padding: 0.25rem 0.5rem; border-radius: 4px; font-family: monospace; font-size: 0.85rem;">Shift+⌘</kbd>
     </div>
 
     <script>
@@ -795,6 +951,47 @@
           resultDiv.textContent = result;
         });
 
+      // IME global variable
+      let hangulIme = null;
+
+      function toggleIme() {
+        if (!hangulIme) return;
+        
+        const indicator = document.getElementById('imeIndicator');
+        const textarea = document.getElementById('imeInput');
+        
+        if (hangulIme.isEnabled()) {
+          hangulIme.disable();
+          document.getElementById('imeToggle').textContent = 'Enable IME';
+          document.getElementById('imeStatus').innerHTML = 'Press <kbd style="background: #e8e8f0; padding: 0.25rem 0.5rem; border-radius: 4px; font-family: monospace;">Shift+Space</kbd> to toggle';
+          indicator.classList.remove('active');
+          textarea.classList.remove('ime-active');
+        } else {
+          hangulIme.enable();
+          document.getElementById('imeToggle').textContent = 'Disable IME';
+          document.getElementById('imeStatus').innerHTML = '<span style="color: var(--success);">Active</span> (Press <kbd style="background: #e8e8f0; padding: 0.25rem 0.5rem; border-radius: 4px; font-family: monospace;">Shift+Space</kbd> to toggle)';
+          indicator.classList.add('active');
+          textarea.classList.add('ime-active');
+          textarea.focus(); // Focus the input when enabling
+        }
+      }
+
+      function toggleDebug() {
+        if (!hangulIme) return;
+        
+        const currentState = hangulIme.isDebugEnabled();
+        hangulIme.setDebug(!currentState);
+        
+        const button = document.getElementById('debugToggle');
+        if (hangulIme.isDebugEnabled()) {
+          button.textContent = 'Debug: ON';
+          button.style.background = 'var(--success)';
+        } else {
+          button.textContent = 'Debug: OFF';
+          button.style.background = 'var(--text-light)';
+        }
+      }
+
       // Initialize WASM module (optional - JavaScript fallback is fully functional)
       async function initializeWasm() {
         try {
@@ -804,29 +1001,44 @@
             return;
           }
           const buffer = await response.arrayBuffer();
-          // Provide imports that Zig expects
-          const memory = new WebAssembly.Memory({ initial: 256, maximum: 512 });
-          const stackPointer = new WebAssembly.Global({ value: 'i32', mutable: true }, 0);
-          const table = new WebAssembly.Table({ initial: 128, element: 'anyfunc' });
-          
-          // Zig runtime helper functions
-          const __multi3 = () => 0; // Stub
-          
-          const imports = { 
-            env: { 
-              __linear_memory: memory,
-              __stack_pointer: stackPointer,
-              __indirect_function_table: table,
-              __multi3: __multi3
-            } 
-          };
-          const { instance } = await WebAssembly.instantiate(buffer, imports);
-          window.wasmModule = instance.exports;
+          // Zig exports its own memory, no imports needed
+          const wasmModuleObj = await WebAssembly.instantiate(buffer, {});
+          window.wasmModule = wasmModuleObj.instance.exports;
           
           // Verify key functions are exported
           if (window.wasmModule && typeof window.wasmModule.wasm_isHangulSyllable === 'function') {
-            updateStatus("Ready (WASM loaded)", "success");
+            updateStatus("Ready (WASM + IME loaded)", "success");
             console.log("WASM module loaded successfully");
+            
+            // Initialize IME if functions are available
+            if (typeof window.wasmModule.wasm_ime_create === 'function') {
+              try {
+                // Dynamically import the IME module
+                const imeModule = await import('./hangul-ime.js');
+                hangulIme = imeModule.setupIme(wasmModuleObj, '#imeInput');
+                
+                // Show IME section
+                document.getElementById('imeSection').style.display = 'block';
+                
+                // Add Shift+Space toggle
+                document.addEventListener('keydown', (e) => {
+                  if (e.shiftKey && e.code === 'Space') {
+                    e.preventDefault();
+                    toggleIme();
+                  }
+                  
+                  // Add Ctrl+Shift+D for debug toggle
+                  if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+                    e.preventDefault();
+                    toggleDebug();
+                  }
+                });
+                
+                console.log("IME initialized successfully");
+              } catch (imeError) {
+                console.error("Failed to initialize IME:", imeError);
+              }
+            }
           } else {
             console.log("WASM loaded but functions unavailable, using JavaScript");
             window.wasmModule = null;

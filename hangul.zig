@@ -321,16 +321,22 @@ fn decodeUtf8Char(bytes: [*]const u8, start: u32, max_len: u32) Utf8Char {
 
 // Simple static buffer allocator for WASM (no threading required)
 const WASM_BUFFER_SIZE = 16 * 1024; // 16KB buffer
-var wasm_buffer: [WASM_BUFFER_SIZE]u8 = undefined;
+var wasm_buffer: [WASM_BUFFER_SIZE]u8 align(8) = undefined;
 var wasm_alloc_ptr: u32 = 0;
 
 export fn wasm_alloc(size: u32) u32 {
-    if (wasm_alloc_ptr + size > WASM_BUFFER_SIZE) {
+    // Align to 4 bytes for safe u32 access (required by JavaScript TypedArrays)
+    const alignment: u32 = 4;
+    const mask: u32 = alignment - 1;
+    const inverted_mask: u32 = ~mask;
+    const aligned_ptr = (wasm_alloc_ptr + mask) & inverted_mask;
+
+    if (aligned_ptr + size > WASM_BUFFER_SIZE) {
         return 0; // Allocation failed
     }
-    const ptr = wasm_alloc_ptr;
-    wasm_alloc_ptr += size;
-    return ptr;
+    const ptr = @intFromPtr(&wasm_buffer[aligned_ptr]);
+    wasm_alloc_ptr = aligned_ptr + size;
+    return @intCast(ptr);
 }
 
 export fn wasm_free(ptr: u32, size: u32) void {
@@ -1080,6 +1086,97 @@ fn processBackspace(state: *ImeState) ?u32 {
     }
 
     return null; // Already empty
+}
+
+// ============================================================================
+// WASM API Exports for IME
+// ============================================================================
+
+/// Create new IME instance
+/// Returns handle (pointer to ImeState in WASM memory)
+/// Returns 0 if allocation fails
+export fn wasm_ime_create() u32 {
+    const state_ptr = wasm_alloc(@sizeOf(ImeState));
+    if (state_ptr == 0) return 0;
+
+    const state: *ImeState = @ptrFromInt(state_ptr);
+    state.* = ImeState.init();
+    return state_ptr;
+}
+
+/// Destroy IME instance
+/// @param handle: Pointer returned from wasm_ime_create
+export fn wasm_ime_destroy(handle: u32) void {
+    if (handle == 0) return;
+    wasm_free(handle, @sizeOf(ImeState));
+}
+
+/// Reset IME composition state
+/// @param handle: IME instance pointer
+export fn wasm_ime_reset(handle: u32) void {
+    if (handle == 0) return;
+    const state: *ImeState = @ptrFromInt(handle);
+    state.reset();
+}
+
+/// Process keystroke (2-Bulsik layout only for now)
+/// @param handle: IME instance pointer
+/// @param jamo_index: ohi.js jamo index (1-51)
+/// @param result_ptr: Pointer to output buffer (12 bytes = 3 × u32)
+/// @returns true if key was handled
+///
+/// Output buffer format (3 × u32):
+/// [0] action: 0=no_change, 1=replace, 2=emit_and_new
+/// [1] prev_codepoint: Previous character (if action=emit_and_new)
+/// [2] current_codepoint: Current character
+export fn wasm_ime_processKey(
+    handle: u32,
+    jamo_index: i8,
+    result_ptr: u32,
+) bool {
+    if (handle == 0 or result_ptr == 0) return false;
+
+    const state: *ImeState = @ptrFromInt(handle);
+    const output: [*]u32 = @ptrFromInt(result_ptr);
+
+    // Determine if consonant or vowel based on ohi.js index range
+    const result = if (jamo_index < 31)
+        processConsonant2Bulsik(state, jamo_index)
+    else
+        processVowel2Bulsik(state, jamo_index);
+
+    // Write result to output buffer
+    output[0] = @intFromEnum(result.action);
+    output[1] = result.prev_codepoint;
+    output[2] = result.current_codepoint;
+
+    return true;
+}
+
+/// Process backspace
+/// @param handle: IME instance pointer
+/// @returns Updated codepoint (0 if state is now empty)
+export fn wasm_ime_backspace(handle: u32) u32 {
+    if (handle == 0) return 0;
+    const state: *ImeState = @ptrFromInt(handle);
+    return processBackspace(state) orelse 0;
+}
+
+/// Get current composition state (for debugging)
+/// @param handle: IME instance pointer
+/// @param output_ptr: Pointer to output buffer (6 bytes)
+export fn wasm_ime_getState(handle: u32, output_ptr: u32) void {
+    if (handle == 0 or output_ptr == 0) return;
+
+    const state: *ImeState = @ptrFromInt(handle);
+    const output: [*]u8 = @ptrFromInt(output_ptr);
+
+    output[0] = @intCast(state.initial);
+    output[1] = state.initial_flag;
+    output[2] = @intCast(state.medial);
+    output[3] = state.medial_flag;
+    output[4] = @intCast(state.final);
+    output[5] = state.final_flag;
 }
 
 // Build configuration comment:

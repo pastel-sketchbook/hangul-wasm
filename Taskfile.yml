@@ -273,3 +273,62 @@ tasks:
     deps: [build:wasm]
     cmds:
       - bun samples/hangul-demo.ts
+
+  release:patch:
+    desc: Release a patch version (bug fixes)
+    cmds:
+      - task: fmt
+      - task: test
+      - |
+        VERSION=$(cat VERSION)
+        IFS='.' read -r major minor patch <<< "$VERSION"
+        NEW_VERSION="$major.$minor.$((patch + 1))"
+        echo "$NEW_VERSION" > VERSION
+        # Update package.json version
+        sed -i.bak "s/\"version\": \"$VERSION\"/\"version\": \"$NEW_VERSION\"/" package.json
+        rm -f package.json.bak
+        git add VERSION package.json
+        git commit -m "chore: bump version to $NEW_VERSION"
+        git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+        echo "Released v$NEW_VERSION - run 'git push --tags' to publish"
+
+  release:minor:
+    desc: Release a minor version (new features, backward compatible)
+    cmds:
+      - task: fmt
+      - task: test
+      - |
+        VERSION=$(cat VERSION)
+        IFS='.' read -r major minor patch <<< "$VERSION"
+        NEW_VERSION="$major.$((minor + 1)).0"
+        echo "$NEW_VERSION" > VERSION
+        # Update package.json version
+        sed -i.bak "s/\"version\": \"$VERSION\"/\"version\": \"$NEW_VERSION\"/" package.json
+        rm -f package.json.bak
+        git add VERSION package.json
+        git commit -m "chore: bump version to $NEW_VERSION"
+        git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+        echo "Released v$NEW_VERSION - run 'git push --tags' to publish"
+
+  release:major:
+    desc: Release a major version (breaking changes)
+    cmds:
+      - task: fmt
+      - task: test
+      - |
+        VERSION=$(cat VERSION)
+        IFS='.' read -r major minor patch <<< "$VERSION"
+        NEW_VERSION="$((major + 1)).0.0"
+        echo "$NEW_VERSION" > VERSION
+        # Update package.json version
+        sed -i.bak "s/\"version\": \"$VERSION\"/\"version\": \"$NEW_VERSION\"/" package.json
+        rm -f package.json.bak
+        git add VERSION package.json
+        git commit -m "chore: bump version to $NEW_VERSION"
+        git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+        echo "Released v$NEW_VERSION - run 'git push --tags' to publish"
+
+  version:
+    desc: Show current version
+    cmds:
+      - cat VERSION

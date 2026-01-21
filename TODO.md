@@ -4,7 +4,7 @@ This document tracks planned enhancements, known issues, and future work for the
 
 **Current Version**: v0.3.0  
 **Test Status**: 40 tests (39 passed, 1 skipped)  
-**WASM Size**: 4.4KB (ReleaseSmall)
+**WASM Size**: 4.9KB (ReleaseSmall)
 
 ---
 
@@ -73,7 +73,7 @@ This document tracks planned enhancements, known issues, and future work for the
 
 ### Build & Distribution
 
-- [ ] **Add release tasks to Taskfile** - `release:patch`, `release:minor`, `release:major` (documented in AGENTS.md but not in Taskfile.yml)
+- [x] **Add release tasks to Taskfile** - Added `release:patch`, `release:minor`, `release:major` with VERSION file
 - [ ] **GitHub Actions CI** - Automated testing and WASM build on push/PR
 - [ ] **Pre-built WASM releases** - Publish `.wasm` files to GitHub releases
 - [ ] **CDN distribution** - Publish to unpkg or jsdelivr for direct browser usage

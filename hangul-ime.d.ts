@@ -68,7 +68,10 @@ export interface HangulWasmExports {
   wasm_isDoubleVowel(char: number): boolean;
   
   // String processing
+  /** Decompose UTF-8 string into jamo codepoints */
   wasm_decomposeString(input_ptr: number, input_len: number, output_ptr: number): number;
+  /** Compose jamo codepoints back into Hangul syllables */
+  wasm_composeString(input_ptr: number, input_len: number, output_ptr: number): number;
   
   // IME functions
   wasm_ime_create(): number;

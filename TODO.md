@@ -3,7 +3,7 @@
 This document tracks planned enhancements, known issues, and future work for the hangul-wasm library.
 
 **Current Version**: v0.3.0  
-**Test Status**: 40 tests (39 passed, 1 skipped)  
+**Test Status**: 44 tests (43 passed, 1 skipped)  
 **WASM Size**: 4.9KB (ReleaseSmall)
 
 ---
@@ -59,7 +59,7 @@ This document tracks planned enhancements, known issues, and future work for the
 - [x] **Jamo classification utilities** - Added helper functions with WASM exports:
   - `isJamo`, `isVowel`, `isConsonant`, `isDoubleConsonant`, `isDoubleVowel`
 
-- [ ] **Bulk string composition** - Compose array of jamo back into syllables (inverse of `wasm_decomposeString`)
+- [x] **Bulk string composition** - Added `composeString` / `wasm_composeString` (inverse of decompose)
 
 - [ ] **Unicode normalization** - Support NFC/NFD normalization for Hangul strings
 

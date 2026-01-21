@@ -293,6 +293,68 @@ export fn wasm_decompose_safe(syllable: u32, output_ptr: u32, output_size: u32) 
     return false;
 }
 
+/// Compose array of jamo codepoints back into Hangul syllables
+/// This is the inverse of decompose - takes jamo and produces syllables
+/// Non-jamo codepoints pass through unchanged
+/// Returns the number of output codepoints written
+fn composeString(input: [*]const u32, input_len: usize, output: [*]u32) u32 {
+    var out_idx: u32 = 0;
+    var i: usize = 0;
+
+    while (i < input_len) {
+        const c = input[i];
+
+        // Check if this is a consonant that could start a syllable
+        if (isConsonant(c)) {
+            // Look ahead for vowel
+            if (i + 1 < input_len and isVowel(input[i + 1])) {
+                const initial = c;
+                const medial = input[i + 1];
+
+                // Check for final consonant
+                var final: u32 = 0;
+                var consumed: usize = 2;
+
+                if (i + 2 < input_len and isConsonant(input[i + 2])) {
+                    // Check if next char after potential final is a vowel
+                    // If so, the consonant belongs to the next syllable
+                    if (i + 3 < input_len and isVowel(input[i + 3])) {
+                        // Consonant starts next syllable, no final for current
+                        final = 0;
+                        consumed = 2;
+                    } else {
+                        // Consonant is final of current syllable
+                        final = input[i + 2];
+                        consumed = 3;
+                    }
+                }
+
+                // Compose the syllable
+                if (compose(initial, medial, final)) |syllable| {
+                    output[out_idx] = syllable;
+                    out_idx += 1;
+                    i += consumed;
+                    continue;
+                }
+            }
+        }
+
+        // Pass through non-composable characters
+        output[out_idx] = c;
+        out_idx += 1;
+        i += 1;
+    }
+
+    return out_idx;
+}
+
+/// WASM export for composeString
+export fn wasm_composeString(input_ptr: u32, input_len: u32, output_ptr: u32) u32 {
+    const input: [*]const u32 = @ptrFromInt(input_ptr);
+    const output: [*]u32 = @ptrFromInt(output_ptr);
+    return composeString(input, input_len, output);
+}
+
 // String processing - decompose entire string
 // Takes byte offsets into WASM linear memory
 export fn wasm_decomposeString(input_ptr: u32, input_len: u32, output_ptr: u32) u32 {
@@ -568,6 +630,57 @@ test "UTF-8 decoding invalid continuation byte" {
     // Should return 0 because 0x41 is not a valid continuation byte (10xxxxxx)
     try std.testing.expectEqual(@as(u32, 0), c.char);
     try std.testing.expectEqual(@as(u32, 0), c.len);
+}
+
+test "composeString: jamo array to syllables" {
+    // Test composing jamo back into syllables
+    // 한글 decomposed: ㅎ ㅏ ㄴ ㄱ ㅡ ㄹ
+    const jamo = [_]u32{
+        0x314E, 0x314F, 0x3134, // ㅎ ㅏ ㄴ → 한
+        0x3131, 0x3161, 0x3139, // ㄱ ㅡ ㄹ → 글
+    };
+    var output: [10]u32 = undefined;
+
+    const count = composeString(&jamo, jamo.len, &output);
+
+    try std.testing.expectEqual(@as(u32, 2), count);
+    try std.testing.expectEqual(@as(u32, 0xD55C), output[0]); // 한
+    try std.testing.expectEqual(@as(u32, 0xAE00), output[1]); // 글
+}
+
+test "composeString: syllable without final" {
+    // 가 = ㄱ + ㅏ (no final)
+    const jamo = [_]u32{ 0x3131, 0x314F }; // ㄱ ㅏ
+    var output: [5]u32 = undefined;
+
+    const count = composeString(&jamo, jamo.len, &output);
+
+    try std.testing.expectEqual(@as(u32, 1), count);
+    try std.testing.expectEqual(@as(u32, 0xAC00), output[0]); // 가
+}
+
+test "composeString: mixed jamo and non-jamo" {
+    // "A한B" decomposed: A ㅎ ㅏ ㄴ B
+    const input = [_]u32{ 'A', 0x314E, 0x314F, 0x3134, 'B' };
+    var output: [10]u32 = undefined;
+
+    const count = composeString(&input, input.len, &output);
+
+    try std.testing.expectEqual(@as(u32, 3), count);
+    try std.testing.expectEqual(@as(u32, 'A'), output[0]);
+    try std.testing.expectEqual(@as(u32, 0xD55C), output[1]); // 한
+    try std.testing.expectEqual(@as(u32, 'B'), output[2]);
+}
+
+test "composeString: lone consonant passes through" {
+    // Single consonant with no vowel following
+    const jamo = [_]u32{0x3131}; // ㄱ alone
+    var output: [5]u32 = undefined;
+
+    const count = composeString(&jamo, jamo.len, &output);
+
+    try std.testing.expectEqual(@as(u32, 1), count);
+    try std.testing.expectEqual(@as(u32, 0x3131), output[0]); // ㄱ (unchanged)
 }
 
 test "exhaustive roundtrip: all 11172 syllables" {

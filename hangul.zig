@@ -11,6 +11,11 @@ const INITIAL_COUNT: u32 = 19;
 const MEDIAL_COUNT: u32 = 21;
 const FINAL_COUNT: u32 = 28;
 
+// ohi.js index boundaries
+// ohi.js uses 1-30 for consonants, 31-51 for vowels
+const OHI_VOWEL_BASE: i8 = 31; // First vowel index in ohi.js system
+const OHI_JAMO_OFFSET: u32 = 0x3130; // ohi.js uses 0x3130 + index for single jamo
+
 // Compatibility jamo (used for decomposition display)
 const COMPAT_INITIAL = [_]u32{
     0x3131, 0x3132, 0x3134, 0x3137, 0x3138, 0x3139, 0x3141, 0x3142,
@@ -50,8 +55,8 @@ fn ohiIndexToInitialIdx(i: i8) u8 {
 /// Convert ohi.js medial vowel index to COMPAT_MEDIAL array index
 /// Based on ohi.js line 66: j - 31
 fn ohiIndexToMedialIdx(j: i8) u8 {
-    if (j < 31) return 0;
-    return @intCast(j - 31);
+    if (j < OHI_VOWEL_BASE) return 0;
+    return @intCast(j - OHI_VOWEL_BASE);
 }
 
 /// Convert ohi.js final consonant index to COMPAT_FINAL array index
@@ -69,7 +74,7 @@ fn ohiIndexToFinalIdx(k: i8) u8 {
 /// Based on ohi.js line 69: 0x3130 + (i || j || k)
 fn ohiIndexToSingleJamo(idx: i8) u32 {
     if (idx <= 0) return 0;
-    return 0x3130 + @as(u32, @intCast(idx));
+    return OHI_JAMO_OFFSET + @as(u32, @intCast(idx));
 }
 
 /// Result of decomposing a Hangul syllable into jamo components.
@@ -1601,7 +1606,7 @@ pub const ImeState = struct {
             return compose(cho, jung, jong) orelse 0;
         }
 
-        // Return single jamo using ohi.js formula: 0x3130 + index
+        // Return single jamo (partial composition)
         if (self.initial > 0) return ohiIndexToSingleJamo(self.initial);
         if (self.medial > 0) return ohiIndexToSingleJamo(self.medial);
         if (self.final > 0) return ohiIndexToSingleJamo(self.final);

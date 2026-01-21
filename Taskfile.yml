@@ -45,6 +45,12 @@ tasks:
     cmds:
       - zig build test
 
+  test:e2e:
+    desc: Run Playwright end-to-end tests
+    deps: [build:wasm, build:server]
+    cmds:
+      - bunx playwright test
+
   test:verbose:
     desc: Run tests with verbose output
     cmds:
@@ -171,7 +177,13 @@ tasks:
         fi
 
   benchmark:
-    desc: Compile and run performance tests
+    desc: Run performance benchmarks (WASM vs JavaScript)
+    deps: [build:wasm]
+    cmds:
+      - bun bench/benchmark.js
+
+  benchmark:size:
+    desc: Compare WASM binary sizes (ReleaseSmall vs ReleaseFast)
     cmds:
       - |
         echo "Building optimized WASM (ReleaseFast)..."

@@ -37,7 +37,7 @@ This document tracks planned enhancements, known issues, and future work for the
 
 - [x] **Fix skipped test** - Added `decompose_safe logic validation (host)` test that validates the same logic without WASM-specific pointer handling
 - [x] **Add integration tests** - Browser-based tests using Playwright (13 tests covering 2-Bulsik, 3-Bulsik, blur handling, and tools)
-- [ ] **Add performance benchmarks** - Measure and document actual performance vs JavaScript implementations
+- [x] **Add performance benchmarks** - Benchmarks show WASM is 1.5-2x faster for single operations (IME use case), while JS can be faster for bulk due to call overhead
 
 ### IME Improvements
 

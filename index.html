@@ -521,6 +521,113 @@
         height: 12px;
         border-radius: 2px;
       }
+
+      /* Key press visual feedback */
+      .key {
+        transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease;
+      }
+
+      .key.pressed {
+        transform: scale(1.15);
+        box-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
+        filter: brightness(1.2);
+        z-index: 10;
+        position: relative;
+      }
+
+      .key.consonant.pressed {
+        box-shadow: 0 0 16px rgba(212, 165, 212, 0.8);
+      }
+
+      .key.vowel.pressed {
+        box-shadow: 0 0 16px rgba(196, 217, 232, 0.8);
+      }
+
+      .key.initial.pressed {
+        box-shadow: 0 0 16px rgba(212, 165, 212, 0.8);
+      }
+
+      .key.final.pressed {
+        box-shadow: 0 0 16px rgba(240, 217, 193, 0.8);
+      }
+
+      /* Current composition display */
+      .composition-display {
+        background: linear-gradient(135deg, #3d3d4d 0%, #2d2d3d 100%);
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        color: white;
+        font-family: monospace;
+      }
+
+      .composition-display .label {
+        font-size: 0.85rem;
+        color: #aaa;
+        margin: 0;
+        font-weight: 600;
+      }
+
+      .composition-display .value {
+        font-size: 1.5rem;
+        font-weight: 600;
+        min-width: 40px;
+        text-align: center;
+      }
+
+      .composition-display .keys {
+        font-size: 0.9rem;
+        color: #ccc;
+        flex: 1;
+      }
+
+      .composition-display .keys kbd {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        margin-right: 0.25rem;
+        font-size: 0.85rem;
+      }
+
+      /* Clickable keyboard keys */
+      .keyboard .key {
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+      }
+
+      .keyboard .key:hover {
+        transform: scale(1.1);
+        z-index: 5;
+      }
+
+      .keyboard .key:active {
+        transform: scale(0.95);
+      }
+
+      /* Subscript for shifted characters */
+      .keyboard .key sub {
+        font-size: 0.6em;
+        opacity: 0.6;
+        position: absolute;
+        bottom: 2px;
+        right: 3px;
+      }
+
+      /* Shifted keyboard state */
+      .keyboard.shifted .key {
+        box-shadow: 0 0 0 2px var(--success), 0 2px 4px rgba(0,0,0,0.2);
+        transform: translateY(-1px);
+      }
+
+      .keyboard.shifted .key sub {
+        opacity: 1;
+        font-weight: bold;
+        color: var(--success);
+      }
     </style>
   </head>
   <body>
@@ -546,50 +653,68 @@
           <h2 style="margin-bottom: 1.5rem; color: var(--text-dark);">2벌식 (Dubeolsik) - Standard Korean Layout</h2>
           
           <!-- Keyboard Layout -->
-          <div class="keyboard">
+          <div class="keyboard" id="keyboard-2bulsik">
             <div class="keyboard-row">
-              <span class="key neutral">1</span><span class="key neutral">2</span><span class="key neutral">3</span>
-              <span class="key neutral">4</span><span class="key neutral">5</span><span class="key neutral">6</span>
-              <span class="key neutral">7</span><span class="key neutral">8</span><span class="key neutral">9</span><span class="key neutral">0</span>
+              <span class="key neutral" data-key="1">1</span><span class="key neutral" data-key="2">2</span><span class="key neutral" data-key="3">3</span>
+              <span class="key neutral" data-key="4">4</span><span class="key neutral" data-key="5">5</span><span class="key neutral" data-key="6">6</span>
+              <span class="key neutral" data-key="7">7</span><span class="key neutral" data-key="8">8</span><span class="key neutral" data-key="9">9</span><span class="key neutral" data-key="0">0</span>
             </div>
             <div class="keyboard-row">
-              <span class="key consonant" title="q → ㅂ (Shift: ㅃ)">ㅂ</span>
-              <span class="key consonant" title="w → ㅈ (Shift: ㅉ)">ㅈ</span>
-              <span class="key consonant" title="e → ㄷ (Shift: ㄸ)">ㄷ</span>
-              <span class="key consonant" title="r → ㄱ (Shift: ㄲ)">ㄱ</span>
-              <span class="key consonant" title="t → ㅅ (Shift: ㅆ)">ㅅ</span>
-              <span class="key vowel" title="y → ㅛ">ㅛ</span>
-              <span class="key vowel" title="u → ㅕ">ㅕ</span>
-              <span class="key vowel" title="i → ㅑ">ㅑ</span>
-              <span class="key vowel" title="o → ㅐ (Shift: ㅒ)">ㅐ</span>
-              <span class="key vowel" title="p → ㅔ (Shift: ㅖ)">ㅔ</span>
+              <span class="key consonant" data-key="q" title="q → ㅂ (Shift: ㅃ)">ㅂ</span>
+              <span class="key consonant" data-key="w" title="w → ㅈ (Shift: ㅉ)">ㅈ</span>
+              <span class="key consonant" data-key="e" title="e → ㄷ (Shift: ㄸ)">ㄷ</span>
+              <span class="key consonant" data-key="r" title="r → ㄱ (Shift: ㄲ)">ㄱ</span>
+              <span class="key consonant" data-key="t" title="t → ㅅ (Shift: ㅆ)">ㅅ</span>
+              <span class="key vowel" data-key="y" title="y → ㅛ">ㅛ</span>
+              <span class="key vowel" data-key="u" title="u → ㅕ">ㅕ</span>
+              <span class="key vowel" data-key="i" title="i → ㅑ">ㅑ</span>
+              <span class="key vowel" data-key="o" title="o → ㅐ (Shift: ㅒ)">ㅐ</span>
+              <span class="key vowel" data-key="p" title="p → ㅔ (Shift: ㅖ)">ㅔ</span>
             </div>
             <div class="keyboard-row" style="padding-left: 20px;">
-              <span class="key consonant" title="a → ㅁ">ㅁ</span>
-              <span class="key consonant" title="s → ㄴ">ㄴ</span>
-              <span class="key consonant" title="d → ㅇ">ㅇ</span>
-              <span class="key consonant" title="f → ㄹ">ㄹ</span>
-              <span class="key consonant" title="g → ㅎ">ㅎ</span>
-              <span class="key vowel" title="h → ㅗ">ㅗ</span>
-              <span class="key vowel" title="j → ㅓ">ㅓ</span>
-              <span class="key vowel" title="k → ㅏ">ㅏ</span>
-              <span class="key vowel" title="l → ㅣ">ㅣ</span>
+              <span class="key consonant" data-key="a" title="a → ㅁ">ㅁ</span>
+              <span class="key consonant" data-key="s" title="s → ㄴ">ㄴ</span>
+              <span class="key consonant" data-key="d" title="d → ㅇ">ㅇ</span>
+              <span class="key consonant" data-key="f" title="f → ㄹ">ㄹ</span>
+              <span class="key consonant" data-key="g" title="g → ㅎ">ㅎ</span>
+              <span class="key vowel" data-key="h" title="h → ㅗ">ㅗ</span>
+              <span class="key vowel" data-key="j" title="j → ㅓ">ㅓ</span>
+              <span class="key vowel" data-key="k" title="k → ㅏ">ㅏ</span>
+              <span class="key vowel" data-key="l" title="l → ㅣ">ㅣ</span>
             </div>
             <div class="keyboard-row" style="padding-left: 40px;">
-              <span class="key consonant" title="z → ㅋ">ㅋ</span>
-              <span class="key consonant" title="x → ㅌ">ㅌ</span>
-              <span class="key consonant" title="c → ㅊ">ㅊ</span>
-              <span class="key consonant" title="v → ㅍ">ㅍ</span>
-              <span class="key vowel" title="b → ㅠ">ㅠ</span>
-              <span class="key vowel" title="n → ㅜ">ㅜ</span>
-              <span class="key vowel" title="m → ㅡ">ㅡ</span>
+              <span class="key consonant" data-key="z" title="z → ㅋ">ㅋ</span>
+              <span class="key consonant" data-key="x" title="x → ㅌ">ㅌ</span>
+              <span class="key consonant" data-key="c" title="c → ㅊ">ㅊ</span>
+              <span class="key consonant" data-key="v" title="v → ㅍ">ㅍ</span>
+              <span class="key vowel" data-key="b" title="b → ㅠ">ㅠ</span>
+              <span class="key vowel" data-key="n" title="n → ㅜ">ㅜ</span>
+              <span class="key vowel" data-key="m" title="m → ㅡ">ㅡ</span>
+            </div>
+          </div>
+          
+          <!-- Composition Display -->
+          <div class="composition-display" id="composition-2bulsik">
+            <div>
+              <div class="label">Current</div>
+              <div class="value" id="currentChar-2bulsik">—</div>
+            </div>
+            <div class="keys">
+              <span class="label">Keys: </span>
+              <span id="keySequence-2bulsik">—</span>
             </div>
           </div>
           
           <div class="legend">
             <span class="legend-item"><span class="legend-color" style="background: #d4a5d4;"></span>Consonants (자음)</span>
             <span class="legend-item"><span class="legend-color" style="background: #c4d9e8;"></span>Vowels (모음)</span>
-            <span style="margin-left: auto; font-weight: 600;">Shift: ㅃㅉㄸㄲㅆㅒㅖ</span>
+            <button id="shiftToggle-2bulsik" onmousedown="event.preventDefault(); toggleVirtualShift('2bulsik')" style="margin-left: auto; padding: 0.4rem 0.8rem; font-size: 0.8rem; background: var(--text-light); color: white; border: none; border-radius: 4px; cursor: pointer;">
+              Shift: OFF
+            </button>
+          </div>
+          
+          <div style="font-size: 0.85rem; color: #888; margin-top: 0.5rem; text-align: center;">
+            Click keys to type · Toggle Shift for: ㅃㅉㄸㄲㅆㅒㅖ
           </div>
 
           <!-- IME Controls -->
@@ -615,48 +740,79 @@
 
         <!-- 3-Bulsik Tab Content -->
         <div class="tab-content" id="tab-3bulsik">
-          <h2 style="margin-bottom: 1.5rem; color: var(--text-dark);">3벌식 (Sebeolsik) - Three-Set Layout</h2>
+          <h2 style="margin-bottom: 0.5rem; color: var(--text-dark);">3벌식 (Sebeolsik) - Three-Set Layout</h2>
+          
+          <!-- Explanation for foreign users -->
+          <div style="background: linear-gradient(135deg, #2a3a4a 0%, #1a2a3a 100%); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; font-size: 0.9rem; color: #ccc; line-height: 1.5;">
+            <strong style="color: #c4d9e8;">About 3-Bulsik:</strong> Unlike 2-Bulsik where consonants serve as both initial and final, 
+            3-Bulsik has <em>separate keys</em> for initial consonants (초성, right side), vowels (중성, middle), and final consonants (종성, left side). 
+            This allows typing in any order: you can type the final before the vowel! 
+            <br><strong style="color: #f0d9c1;">Note:</strong> Many final consonants require <kbd style="background: rgba(255,255,255,0.15); padding: 0.1rem 0.4rem; border-radius: 3px;">Shift</kbd> (shown as subscript on keys).
+          </div>
           
           <!-- Keyboard Layout -->
-          <div class="keyboard">
+          <div class="keyboard" id="keyboard-3bulsik">
             <div class="keyboard-row">
-              <span class="key final" title="1 → ㅎ (final)">ㅎ</span>
-              <span class="key final" title="2 → ㅆ (final)">ㅆ</span>
-              <span class="key final" title="3 → ㅂ (final)">ㅂ</span>
-              <span class="key neutral">4</span><span class="key neutral">5</span><span class="key neutral">6</span>
-              <span class="key neutral">7</span><span class="key neutral">8</span><span class="key neutral">9</span><span class="key neutral">0</span>
+              <span class="key final" data-key="1" title="1 → ㅍ (final), Shift: !→ㄲ">ㅍ<sub>ㄲ</sub></span>
+              <span class="key final" data-key="2" title="2 → ㅅ (final), Shift: @→ㄹ">ㅅ<sub>ㄹ</sub></span>
+              <span class="key final" data-key="3" title="3 → ㅁ (final), Shift: #→ㅇ">ㅁ<sub>ㅇ</sub></span>
+              <span class="key vowel" data-key="4" title="4 → ㅛ, Shift: $→ㄾ">ㅛ</span>
+              <span class="key vowel" data-key="5" title="5 → ㅠ, Shift: %→ㄽ">ㅠ</span>
+              <span class="key vowel" data-key="6" title="6 → ㅑ">ㅑ</span>
+              <span class="key vowel" data-key="7" title="7 → ㅖ">ㅖ</span>
+              <span class="key vowel" data-key="8" title="8 → ㅢ">ㅢ</span>
+              <span class="key vowel" data-key="9" title="9 → ㅜ">ㅜ</span>
+              <span class="key initial" data-key="0" title="0 → ㅋ (initial)">ㅋ</span>
             </div>
             <div class="keyboard-row">
-              <span class="key final" title="q → ㅅ (final)">ㅅ</span>
-              <span class="key final" title="w → ㄹ (final)">ㄹ</span>
-              <span class="key vowel" title="e → ㅕ">ㅕ</span>
-              <span class="key vowel" title="r → ㅓ">ㅓ</span>
-              <span class="key vowel" title="t → ㅡ">ㅡ</span>
-              <span class="key initial" title="y → ㅈ (initial)">ㅈ</span>
-              <span class="key initial" title="u → ㄷ (initial)">ㄷ</span>
-              <span class="key initial" title="i → ㅁ (initial)">ㅁ</span>
-              <span class="key initial" title="o → ㅊ (initial)">ㅊ</span>
-              <span class="key initial" title="p → ㅍ (initial)">ㅍ</span>
+              <span class="key final" data-key="q" title="q → ㅄ (final), Shift: Q→ㅌ">ㅄ<sub>ㅌ</sub></span>
+              <span class="key final" data-key="w" title="w → ㄸ (final), Shift: W→ㅋ">ㄸ<sub>ㅋ</sub></span>
+              <span class="key vowel" data-key="e" title="e → ㅕ, Shift: E→ㄵ">ㅕ</span>
+              <span class="key vowel" data-key="r" title="r → ㅐ, Shift: R→ㄿ">ㅐ</span>
+              <span class="key vowel" data-key="t" title="t → ㅓ, Shift: T→ㄼ">ㅓ</span>
+              <span class="key initial" data-key="y" title="y → ㄹ (initial)">ㄹ</span>
+              <span class="key initial" data-key="u" title="u → ㄷ (initial)">ㄷ</span>
+              <span class="key initial" data-key="i" title="i → ㅁ (initial)">ㅁ</span>
+              <span class="key initial" data-key="o" title="o → ㅊ (initial)">ㅊ</span>
+              <span class="key initial" data-key="p" title="p → ㅍ (initial)">ㅍ</span>
             </div>
             <div class="keyboard-row" style="padding-left: 20px;">
-              <span class="key vowel" title="a → ㅗ">ㅗ</span>
-              <span class="key vowel" title="s → ㅏ">ㅏ</span>
-              <span class="key vowel" title="d → ㅣ">ㅣ</span>
-              <span class="key vowel" title="f → ㅏ">ㅏ</span>
-              <span class="key vowel" title="g → ㅜ">ㅜ</span>
-              <span class="key initial" title="h → ㄴ (initial)">ㄴ</span>
-              <span class="key initial" title="j → ㅇ (initial)">ㅇ</span>
-              <span class="key initial" title="k → ㄱ (initial)">ㄱ</span>
-              <span class="key initial" title="l → ㅅ (initial)">ㅅ</span>
+              <span class="key final" data-key="a" title="a → ㅆ (final), Shift: A→ㄷ">ㅆ<sub>ㄷ</sub></span>
+              <span class="key final" data-key="s" title="s → ㄴ (final), Shift: S→ㄶ">ㄴ<sub>ㄶ</sub></span>
+              <span class="key vowel" data-key="d" title="d → ㅣ, Shift: D→ㄻ">ㅣ</span>
+              <span class="key vowel" data-key="f" title="f → ㅏ, Shift: F→ㄺ">ㅏ</span>
+              <span class="key vowel" data-key="g" title="g → ㅡ">ㅡ</span>
+              <span class="key initial" data-key="h" title="h → ㄴ (initial)">ㄴ</span>
+              <span class="key initial" data-key="j" title="j → ㅇ (initial)">ㅇ</span>
+              <span class="key initial" data-key="k" title="k → ㄱ (initial)">ㄱ</span>
+              <span class="key initial" data-key="l" title="l → ㅈ (initial)">ㅈ</span>
             </div>
             <div class="keyboard-row" style="padding-left: 40px;">
-              <span class="key vowel" title="z → ㅠ">ㅠ</span>
-              <span class="key final" title="x → ㄴ (final)">ㄴ</span>
-              <span class="key vowel" title="c → ㅔ">ㅔ</span>
-              <span class="key final" title="v → ㄱ (final)">ㄱ</span>
-              <span class="key vowel" title="b → ㅠ">ㅠ</span>
-              <span class="key initial" title="n → ㅎ (initial)">ㅎ</span>
-              <span class="key initial" title="m → ㅎ (initial)">ㅎ</span>
+              <span class="key final" data-key="z" title="z → ㅀ (final), Shift: Z→ㅈ">ㅀ<sub>ㅈ</sub></span>
+              <span class="key final" data-key="x" title="x → ㄱ (final), Shift: X→ㅂ">ㄱ<sub>ㅂ</sub></span>
+              <span class="key vowel" data-key="c" title="c → ㅔ, Shift: C→ㅊ">ㅔ</span>
+              <span class="key vowel" data-key="v" title="v → ㅗ, Shift: V→ㄳ">ㅗ</span>
+              <span class="key vowel" data-key="b" title="b → ㅜ">ㅜ</span>
+              <span class="key initial" data-key="n" title="n → ㅅ (initial)">ㅅ</span>
+              <span class="key initial" data-key="m" title="m → ㅎ (initial)">ㅎ</span>
+            </div>
+          </div>
+          
+          <!-- Shifted Finals Note -->
+          <div style="background: #2d2d3d; border-radius: 8px; padding: 0.75rem 1rem; margin: 0.5rem 0; font-size: 0.85rem; color: #aaa;">
+            <strong style="color: #f0d9c1;">Tip:</strong> For final ㄹ, use <kbd style="background: rgba(255,255,255,0.1); padding: 0.1rem 0.4rem; border-radius: 3px;">Shift+2</kbd> (@). 
+            Subscript shows Shift variants. Example: "딸" = <kbd>u</kbd><kbd>u</kbd><kbd>f</kbd><kbd>@</kbd>
+          </div>
+          
+          <!-- Composition Display -->
+          <div class="composition-display" id="composition-3bulsik">
+            <div>
+              <div class="label">Current</div>
+              <div class="value" id="currentChar-3bulsik">—</div>
+            </div>
+            <div class="keys">
+              <span class="label">Keys: </span>
+              <span id="keySequence-3bulsik">—</span>
             </div>
           </div>
           
@@ -664,6 +820,13 @@
             <span class="legend-item"><span class="legend-color" style="background: #d4a5d4;"></span>Initial (초성)</span>
             <span class="legend-item"><span class="legend-color" style="background: #c4d9e8;"></span>Medial (중성)</span>
             <span class="legend-item"><span class="legend-color" style="background: #f0d9c1;"></span>Final (종성)</span>
+            <button id="shiftToggle-3bulsik" onmousedown="event.preventDefault(); toggleVirtualShift('3bulsik')" style="margin-left: auto; padding: 0.4rem 0.8rem; font-size: 0.8rem; background: var(--text-light); color: white; border: none; border-radius: 4px; cursor: pointer;">
+              Shift: OFF
+            </button>
+          </div>
+          
+          <div style="font-size: 0.85rem; color: #888; margin-top: 0.5rem; text-align: center;">
+            Click keys to type · Shift for more finals (subscript shows shifted)
           </div>
 
           <!-- IME Controls -->
@@ -1186,6 +1349,247 @@
         });
       }
 
+      // Visual keyboard feedback
+      const keyPressTimeouts = new Map();
+      
+      function highlightKey(key, keyboardId) {
+        const keyboard = document.getElementById(keyboardId);
+        if (!keyboard) return;
+        
+        // Find the key element (case insensitive)
+        const keyEl = keyboard.querySelector(`[data-key="${key.toLowerCase()}"]`);
+        if (!keyEl) return;
+        
+        // Clear any existing timeout for this key
+        const timeoutKey = `${keyboardId}-${key.toLowerCase()}`;
+        if (keyPressTimeouts.has(timeoutKey)) {
+          clearTimeout(keyPressTimeouts.get(timeoutKey));
+        }
+        
+        // Add pressed class
+        keyEl.classList.add('pressed');
+        
+        // Remove after animation (150ms)
+        const timeout = setTimeout(() => {
+          keyEl.classList.remove('pressed');
+          keyPressTimeouts.delete(timeoutKey);
+        }, 150);
+        
+        keyPressTimeouts.set(timeoutKey, timeout);
+      }
+      
+      function updateCompositionDisplay(tabId) {
+        const currentCharEl = document.getElementById(`currentChar-${tabId}`);
+        const keySequenceEl = document.getElementById(`keySequence-${tabId}`);
+        
+        if (!currentCharEl || !keySequenceEl || !hangulIme) return;
+        
+        // Get current composition from textarea
+        const textareaId = tabId === '2bulsik' ? 'imeInput' : 'imeInput3';
+        const textarea = document.getElementById(textareaId);
+        
+        if (hangulIme.hasComposition && hangulIme.compositionStart >= 0) {
+          const currentChar = textarea.value[hangulIme.compositionStart];
+          currentCharEl.textContent = currentChar || '—';
+          
+          // Display key sequence
+          if (hangulIme.keySequence.length > 0) {
+            keySequenceEl.innerHTML = hangulIme.keySequence
+              .map(k => `<kbd>${k}</kbd>`)
+              .join(' ');
+          } else {
+            keySequenceEl.textContent = '—';
+          }
+        } else {
+          currentCharEl.textContent = '—';
+          keySequenceEl.textContent = '—';
+        }
+      }
+      
+      function setupKeyboardVisualFeedback() {
+        // Listen for keydown on the IME textareas
+        const textareas = ['imeInput', 'imeInput3'];
+        
+        textareas.forEach((textareaId, idx) => {
+          const textarea = document.getElementById(textareaId);
+          if (!textarea) return;
+          
+          const keyboardId = idx === 0 ? 'keyboard-2bulsik' : 'keyboard-3bulsik';
+          const tabId = idx === 0 ? '2bulsik' : '3bulsik';
+          
+          textarea.addEventListener('keydown', (e) => {
+            // Only process if IME is enabled and this is a character key
+            if (!hangulIme || !hangulIme.isEnabled()) return;
+            
+            // Get the physical key (single character keys only)
+            if (e.key.length === 1) {
+              highlightKey(e.key, keyboardId);
+            }
+          });
+          
+          // Update composition display on input
+          textarea.addEventListener('input', () => {
+            updateCompositionDisplay(tabId);
+          });
+          
+          // Also update on keyup for better responsiveness
+          textarea.addEventListener('keyup', () => {
+            setTimeout(() => updateCompositionDisplay(tabId), 10);
+          });
+        });
+      }
+
+      // Shift state for virtual keyboard clicking (tracks actual Shift key)
+      let virtualShiftState = {
+        '2bulsik': false,
+        '3bulsik': false
+      };
+
+      function updateShiftIndicator(tabId, isShifted) {
+        virtualShiftState[tabId] = isShifted;
+        const btn = document.getElementById(`shiftToggle-${tabId}`);
+        if (btn) {
+          if (isShifted) {
+            btn.textContent = 'Shift: ON';
+            btn.style.background = 'var(--success)';
+          } else {
+            btn.textContent = 'Shift: OFF';
+            btn.style.background = 'var(--text-light)';
+          }
+        }
+        // Update keyboard visual to show shifted characters
+        updateKeyboardShiftDisplay(tabId);
+      }
+
+      // Listen for actual Shift key press/release
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Shift') {
+          updateShiftIndicator('2bulsik', true);
+          updateShiftIndicator('3bulsik', true);
+        }
+      });
+
+      document.addEventListener('keyup', (e) => {
+        if (e.key === 'Shift') {
+          updateShiftIndicator('2bulsik', false);
+          updateShiftIndicator('3bulsik', false);
+        }
+      });
+
+      // Also allow clicking the button to toggle (for touch/mouse-only users)
+      function toggleVirtualShift(tabId) {
+        updateShiftIndicator(tabId, !virtualShiftState[tabId]);
+      }
+
+      function updateKeyboardShiftDisplay(tabId) {
+        const keyboard = document.getElementById(`keyboard-${tabId}`);
+        if (!keyboard) return;
+        
+        if (virtualShiftState[tabId]) {
+          keyboard.classList.add('shifted');
+        } else {
+          keyboard.classList.remove('shifted');
+        }
+      }
+
+      function simulateKeyPress(key, shifted, tabId) {
+        if (!hangulIme) return;
+        
+        const textareaId = tabId === '2bulsik' ? 'imeInput' : 'imeInput3';
+        const textarea = document.getElementById(textareaId);
+        if (!textarea) return;
+        
+        // Ensure correct layout mode is set for this tab (only if different to avoid reset)
+        if (hangulIme.getLayoutMode() !== tabId) {
+          hangulIme.setLayoutMode(tabId);
+        }
+        
+        // Enable IME if not already enabled
+        if (!hangulIme.isEnabled()) {
+          hangulIme.enable();
+          // Update UI to reflect enabled state
+          const toggleBtn = document.getElementById(tabId === '2bulsik' ? 'imeToggle2' : 'imeToggle3');
+          const statusEl = document.getElementById(tabId === '2bulsik' ? 'imeStatus2' : 'imeStatus3');
+          if (toggleBtn) toggleBtn.textContent = 'Disable IME';
+          if (statusEl) statusEl.innerHTML = '<span style="color: var(--success);">Active</span>';
+          document.getElementById('imeIndicator')?.classList.add('active');
+          textarea.classList.add('ime-active');
+        }
+        
+        // Determine the actual character to send
+        let charToSend = key;
+        if (shifted) {
+          // Map lowercase to uppercase for shifted
+          charToSend = key.toUpperCase();
+          // Handle special shifted characters on number row
+          const shiftMap = {
+            '1': '!', '2': '@', '3': '#', '4': '$', '5': '%',
+            '6': '^', '7': '&', '8': '*', '9': '(', '0': ')'
+          };
+          if (shiftMap[key]) {
+            charToSend = shiftMap[key];
+          }
+        }
+        
+        // Create a mock event object for the IME
+        const mockEvent = {
+          key: charToSend,
+          preventDefault: () => {},
+          stopPropagation: () => {}
+        };
+        
+        // Directly call the IME's handleKeyPress method
+        const handled = hangulIme.handleKeyPress(mockEvent, textarea);
+        
+        // If handled, the IME has already updated the textarea
+        // If not handled (not a Korean key), insert the character directly
+        if (!handled) {
+          // Insert the character at cursor position
+          const start = textarea.selectionStart;
+          const end = textarea.selectionEnd;
+          const value = textarea.value;
+          textarea.value = value.slice(0, start) + charToSend + value.slice(end);
+          textarea.selectionStart = textarea.selectionEnd = start + 1;
+        }
+        
+        // Focus the textarea after processing (to maintain typing context)
+        textarea.focus();
+        
+        // Highlight the key
+        const keyboardId = `keyboard-${tabId}`;
+        highlightKey(key, keyboardId);
+        
+        // Update composition display
+        setTimeout(() => updateCompositionDisplay(tabId), 20);
+      }
+
+      function setupKeyboardClickHandlers() {
+        const keyboards = [
+          { id: 'keyboard-2bulsik', tabId: '2bulsik' },
+          { id: 'keyboard-3bulsik', tabId: '3bulsik' }
+        ];
+        
+        keyboards.forEach(({ id, tabId }) => {
+          const keyboard = document.getElementById(id);
+          if (!keyboard) return;
+          
+          // Add mousedown handler to all keys (prevents focus loss from textarea)
+          const keys = keyboard.querySelectorAll('.key[data-key]');
+          keys.forEach(keyEl => {
+            keyEl.style.cursor = 'pointer';
+            // Use mousedown to prevent focus loss from textarea
+            keyEl.addEventListener('mousedown', (e) => {
+              e.preventDefault(); // Prevent focus change
+              const key = keyEl.getAttribute('data-key');
+              const isShifted = virtualShiftState[tabId];
+              if (key) {
+                simulateKeyPress(key, isShifted, tabId);
+              }
+            });
+          });
+        });
+      }
+
       // Initialize WASM module (optional - JavaScript fallback is fully functional)
       async function initializeWasm() {
         try {
@@ -1227,6 +1631,12 @@
                 });
                 
                 console.log("IME initialized successfully");
+                
+                // Setup visual keyboard feedback
+                setupKeyboardVisualFeedback();
+                
+                // Setup click-to-type handlers
+                setupKeyboardClickHandlers();
               } catch (imeError) {
                 console.error("Failed to initialize IME:", imeError);
               }

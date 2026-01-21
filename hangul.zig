@@ -889,14 +889,14 @@ test "double jamo: medial vowels" {
 }
 
 test "double jamo: final consonants" {
-    // ㄱ+ㅅ=ㄳ
-    try std.testing.expectEqual(@as(u8, 3), detectDoubleJamo(.final, 1, 19));
-    // ㄴ+ㅈ=ㄵ
-    try std.testing.expectEqual(@as(u8, 5), detectDoubleJamo(.final, 4, 22));
-    // ㄴ+ㅎ=ㄶ
-    try std.testing.expectEqual(@as(u8, 6), detectDoubleJamo(.final, 4, 27));
-    // ㅂ+ㅅ=ㅄ
-    try std.testing.expectEqual(@as(u8, 20), detectDoubleJamo(.final, 18, 19));
+    // ㄱ+ㅅ=ㄳ (ohi index: ㄱ=1, ㅅ=21)
+    try std.testing.expectEqual(@as(u8, 3), detectDoubleJamo(.final, 1, 21));
+    // ㄴ+ㅈ=ㄵ (ohi index: ㄴ=4, ㅈ=24)
+    try std.testing.expectEqual(@as(u8, 5), detectDoubleJamo(.final, 4, 24));
+    // ㄴ+ㅎ=ㄶ (ohi index: ㄴ=4, ㅎ=30)
+    try std.testing.expectEqual(@as(u8, 6), detectDoubleJamo(.final, 4, 30));
+    // ㅂ+ㅅ=ㅄ (ohi index: ㅂ=18, ㅅ=21)
+    try std.testing.expectEqual(@as(u8, 20), detectDoubleJamo(.final, 18, 21));
     // ㄹ+ㄱ=ㄺ (ohi index: ㄹ=9, ㄱ=1) → result ohi 10 → final[9]
     try std.testing.expectEqual(@as(u8, 10), detectDoubleJamo(.final, 9, 1));
     // ㄹ+ㅁ=ㄻ (ohi index: ㄹ=9, ㅁ=17) → result ohi 11 → final[10]
@@ -1200,7 +1200,7 @@ test "3-bulsik: double jong ㄳ" {
     _ = processCho3Bulsik(&state, 1); // ㄱ
     _ = processJung3Bulsik(&state, 31); // ㅏ
     _ = processJong3Bulsik(&state, 1); // ㄱ
-    const result = processJong3Bulsik(&state, 19); // ㅅ → forms ㄳ
+    const result = processJong3Bulsik(&state, 21); // ㅅ (ohi index 21) → forms ㄳ
 
     try std.testing.expectEqual(.replace, result.action);
     // 갃 = ㄱ + ㅏ + ㄳ = U+AC03
@@ -1234,6 +1234,31 @@ test "3-bulsik: no syllable splitting (unlike 2-bulsik)" {
     try std.testing.expectEqual(.emit_and_new, result.action);
     try std.testing.expectEqual(@as(u32, 0xAC04), result.prev_codepoint); // 간 (not 가)
     try std.testing.expectEqual(@as(u32, 0x314F), result.current_codepoint); // ㅏ (single jamo, not 나)
+}
+
+test "3-bulsik: jong-jung-cho order (typing final first)" {
+    // In 3-Bulsik, user may type final (jong) first, then vowel (jung), then initial (cho)
+    // This tests the jong→jung→cho input order support
+    // Using ohi indices directly: jong 4 (ㄴ), jung 31 (ㅏ), cho 30 (ㅎ)
+    // Expected result: 한 (U+D55C) = ㅎ initial + ㅏ medial + ㄴ final
+    var state = ImeState.init();
+
+    // Step 1: Type jong ㄴ (ohi index 4) - final first, before vowel
+    const r1 = processJong3Bulsik(&state, 4);
+    try std.testing.expectEqual(.replace, r1.action);
+    try std.testing.expectEqual(@as(u32, 0x3134), r1.current_codepoint); // ㄴ (jamo)
+    try std.testing.expectEqual(@as(i8, 4), state.final);
+
+    // Step 2: Type jung ㅏ (ohi index 31) - vowel, state now has jong + jung, waiting for cho
+    const r2 = processJung3Bulsik(&state, 31);
+    try std.testing.expectEqual(.replace, r2.action);
+    try std.testing.expectEqual(@as(i8, 31), state.medial);
+    try std.testing.expectEqual(@as(i8, 4), state.final); // final preserved
+
+    // Step 3: Type cho ㅎ (ohi index 30) - initial completes the syllable
+    const r3 = processCho3Bulsik(&state, 30);
+    try std.testing.expectEqual(.replace, r3.action);
+    try std.testing.expectEqual(@as(u32, 0xD55C), r3.current_codepoint); // 한
 }
 
 test "ime commit finalizes composition" {
@@ -1342,6 +1367,64 @@ test "typing 입력할 then backspace should decompose 할" {
     try std.testing.expectEqual(@as(i8, 30), state.initial); // ㅎ
     try std.testing.expectEqual(@as(i8, 31), state.medial); // ㅏ
     try std.testing.expectEqual(@as(i8, 0), state.final); // no final
+}
+
+test "typing 않 (double final ㄶ = ㄴ+ㅎ)" {
+    // Tests the fix for ㄴ+ㅎ double final combination
+    // User types: d(ㅇ) + k(ㅏ) + s(ㄴ) + g(ㅎ) → 않
+    var state = ImeState.init();
+
+    // Type ㅇ (ohi index 23)
+    const r1 = processConsonant2Bulsik(&state, 23);
+    try std.testing.expectEqual(.replace, r1.action);
+    try std.testing.expectEqual(@as(u32, 0x3147), r1.current_codepoint); // ㅇ
+
+    // Type ㅏ (ohi index 31)
+    const r2 = processVowel2Bulsik(&state, 31);
+    try std.testing.expectEqual(.replace, r2.action);
+    try std.testing.expectEqual(@as(u32, 0xC544), r2.current_codepoint); // 아
+
+    // Type ㄴ (ohi index 4)
+    const r3 = processConsonant2Bulsik(&state, 4);
+    try std.testing.expectEqual(.replace, r3.action);
+    try std.testing.expectEqual(@as(u32, 0xC548), r3.current_codepoint); // 안
+
+    // Type ㅎ (ohi index 30) - should form double final ㄶ
+    const r4 = processConsonant2Bulsik(&state, 30);
+    try std.testing.expectEqual(.replace, r4.action);
+    try std.testing.expectEqual(@as(u32, 0xC54A), r4.current_codepoint); // 않 (U+C54A)
+
+    // Verify the state has double final
+    try std.testing.expectEqual(@as(i8, 23), state.initial); // ㅇ
+    try std.testing.expectEqual(@as(i8, 31), state.medial); // ㅏ
+    try std.testing.expectEqual(@as(i8, 6), state.final); // ㄶ (double final index 6)
+    try std.testing.expectEqual(@as(u8, 1), state.final_flag); // flag=1 for double
+}
+
+test "typing 않나 (double final followed by new syllable)" {
+    // Tests fix for: double final + new consonant should emit syllable and start new
+    // Bug was: "않" + ㄴ → incorrectly split as "안" + "하" instead of "않" + "나"
+    // User types: d(ㅇ) + k(ㅏ) + s(ㄴ) + g(ㅎ) → 않, then s(ㄴ) + k(ㅏ) → 나
+    var state = ImeState.init();
+
+    // Build "않" first
+    _ = processConsonant2Bulsik(&state, 23); // ㅇ
+    _ = processVowel2Bulsik(&state, 31); // ㅏ → 아
+    _ = processConsonant2Bulsik(&state, 4); // ㄴ → 안
+    const r_anh = processConsonant2Bulsik(&state, 30); // ㅎ → 않
+    try std.testing.expectEqual(@as(u32, 0xC54A), r_anh.current_codepoint); // 않
+    try std.testing.expectEqual(@as(u8, 1), state.final_flag); // double final
+
+    // Now type ㄴ - should emit "않" and start new syllable with ㄴ
+    const r_n = processConsonant2Bulsik(&state, 4); // ㄴ
+    try std.testing.expectEqual(.emit_and_new, r_n.action);
+    try std.testing.expectEqual(@as(u32, 0xC54A), r_n.prev_codepoint); // emits 않
+    try std.testing.expectEqual(@as(u32, 0x3134), r_n.current_codepoint); // composing ㄴ
+
+    // Type ㅏ - should form "나"
+    const r_na = processVowel2Bulsik(&state, 31); // ㅏ
+    try std.testing.expectEqual(.replace, r_na.action);
+    try std.testing.expectEqual(@as(u32, 0xB098), r_na.current_codepoint); // 나
 }
 
 // ============================================================================
@@ -1546,11 +1629,14 @@ const DoubleFinalMap = struct {
     results: []const u8,
 };
 
+// Double final consonants using ohi.js indices (lines 40-46)
+// Note: ohi.js uses different indices for consonants as finals vs initials
+// ㄱ=1, ㄴ=4, ㄹ=9, ㅁ=17, ㅂ=18, ㅅ=21, ㅈ=24, ㅌ=28, ㅍ=29, ㅎ=30
 const DOUBLE_FINAL_MAPS = [_]DoubleFinalMap{
-    .{ .base = 1, .targets = &[_]u8{19}, .results = &[_]u8{3} }, // ㄱ+ㅅ=ㄳ (final[3])
-    .{ .base = 4, .targets = &[_]u8{ 22, 27 }, .results = &[_]u8{ 5, 6 } }, // ㄴ+ㅈ=ㄵ, ㄴ+ㅎ=ㄶ
-    .{ .base = 9, .targets = &[_]u8{ 1, 17, 18, 19, 25, 26, 27 }, .results = &[_]u8{ 10, 11, 12, 13, 14, 15, 16 } }, // ㄹ+ㄱ=ㄺ(10), ㄹ+ㅁ=ㄻ(11), ㄹ+ㅂ=ㄼ(12), ㄹ+ㅅ=ㄽ(13), ㄹ+ㅌ=ㄾ(14), ㄹ+ㅍ=ㄿ(15), ㄹ+ㅎ=ㅀ(16)
-    .{ .base = 18, .targets = &[_]u8{19}, .results = &[_]u8{20} }, // ㅂ+ㅅ=ㅄ (final[18])
+    .{ .base = 1, .targets = &[_]u8{21}, .results = &[_]u8{3} }, // ㄱ+ㅅ(21)=ㄳ (final[3])
+    .{ .base = 4, .targets = &[_]u8{ 24, 30 }, .results = &[_]u8{ 5, 6 } }, // ㄴ+ㅈ(24)=ㄵ, ㄴ+ㅎ(30)=ㄶ
+    .{ .base = 9, .targets = &[_]u8{ 1, 17, 18, 21, 28, 29, 30 }, .results = &[_]u8{ 10, 11, 12, 13, 14, 15, 16 } }, // ㄹ+ㄱ(1)=ㄺ, ㄹ+ㅁ(17)=ㄻ, ㄹ+ㅂ(18)=ㄼ, ㄹ+ㅅ(21)=ㄽ, ㄹ+ㅌ(28)=ㄾ, ㄹ+ㅍ(29)=ㄿ, ㄹ+ㅎ(30)=ㅀ
+    .{ .base = 18, .targets = &[_]u8{21}, .results = &[_]u8{20} }, // ㅂ+ㅅ(21)=ㅄ (final[18])
 };
 
 /// Split a double final consonant back into its two components
@@ -1629,6 +1715,13 @@ fn processConsonant2Bulsik(state: *ImeState, jamo_index: i8) KeyResult {
             return result;
         }
         // Cannot double - will need to emit current syllable
+        should_emit = true;
+    }
+
+    // If we already have a double final (final_flag == 1), we must emit current syllable
+    // and start new. Cannot add more consonants to a double final.
+    // This fixes: "않" + ㄴ → should emit "않" and start "ㄴ", not incorrectly split.
+    if (state.medial > 0 and state.final > 0 and state.final_flag == 1) {
         should_emit = true;
     }
 
@@ -1774,6 +1867,7 @@ fn processVowel2Bulsik(state: *ImeState, jamo_index: i8) KeyResult {
 // ============================================================================
 
 /// Process initial consonant (cho) in 3-Bulsik mode
+/// In 3-Bulsik, user may type in order: jong → jung → cho (final first)
 fn processCho3Bulsik(state: *ImeState, cho_index: u8) KeyResult {
     var result: KeyResult = .{
         .action = .replace,
@@ -1793,6 +1887,17 @@ fn processCho3Bulsik(state: *ImeState, cho_index: u8) KeyResult {
         }
     }
 
+    // 3-Bulsik special case: have jung+jong but no initial (typed in jong→jung→cho order)
+    // Example: user typed '1' (jong ㅎ), 'f' (jung ㅏ), now typing 'h' (cho ㄴ)
+    // Add the initial to complete the syllable: ㄴ + ㅏ + ㅎ = 낳
+    if (state.initial == 0 and state.medial > 0) {
+        state.initial = @intCast(cho_index);
+        state.initial_flag = 0;
+        result.action = .replace;
+        result.current_codepoint = state.toCodepoint();
+        return result;
+    }
+
     // If have any existing composition, emit it first
     if (!state.isEmpty()) {
         result.action = .emit_and_new;
@@ -1809,6 +1914,7 @@ fn processCho3Bulsik(state: *ImeState, cho_index: u8) KeyResult {
 }
 
 /// Process medial vowel (jung) in 3-Bulsik mode
+/// In 3-Bulsik, user may type in order: jong → jung → cho (final first)
 fn processJung3Bulsik(state: *ImeState, jung_index: u8) KeyResult {
     var result: KeyResult = .{
         .action = .replace,
@@ -1828,6 +1934,17 @@ fn processJung3Bulsik(state: *ImeState, jung_index: u8) KeyResult {
         }
         // Cannot double, mark for new syllable
         state.medial = -1;
+    }
+
+    // 3-Bulsik special case: have only jong (final), waiting for jung and cho
+    // Example: user typed '1' (jong ㅎ), now typing 'f' (jung ㅏ)
+    // Keep the final, add the medial, wait for initial
+    if (state.initial == 0 and state.medial == 0 and state.final > 0) {
+        state.medial = @intCast(jung_index);
+        state.medial_flag = 0;
+        result.action = .replace;
+        result.current_codepoint = state.toCodepoint();
+        return result;
     }
 
     // If syllable already has medial or is in invalid state, emit and start new

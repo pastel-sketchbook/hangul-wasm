@@ -65,6 +65,8 @@ export interface HangulWasmExports {
   wasm_ime_processKey(handle: number, jamo_index: number, result_ptr: number): boolean;
   wasm_ime_backspace(handle: number): number;
   wasm_ime_getState(handle: number, state_ptr: number): void;
+  /** Commit current composition and reset state. Returns finalized codepoint (0 if empty). */
+  wasm_ime_commit(handle: number): number;
 }
 
 /**

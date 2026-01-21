@@ -793,6 +793,52 @@ test "double final consonant splitting" {
     try std.testing.expectEqual(@as(u32, 0xAC00), r2.current_codepoint); // 가 (U+AC00) - ㄱ+ㅏ
 }
 
+test "ime commit finalizes composition" {
+    // Test that commit returns the current syllable and resets state
+    var state = ImeState.init();
+
+    // Type 한: ㅎ(30) + ㅏ(31) + ㄴ(4)
+    _ = processConsonant2Bulsik(&state, 30); // ㅎ
+    _ = processVowel2Bulsik(&state, 31); // ㅏ
+    _ = processConsonant2Bulsik(&state, 4); // ㄴ
+
+    try std.testing.expectEqual(@as(u32, 0xD55C), state.toCodepoint()); // 한
+    try std.testing.expect(!state.isEmpty());
+
+    // Simulate commit by getting codepoint and resetting
+    const committed = state.toCodepoint();
+    state.reset();
+
+    try std.testing.expectEqual(@as(u32, 0xD55C), committed); // 한
+    try std.testing.expect(state.isEmpty());
+    try std.testing.expectEqual(@as(u32, 0), state.toCodepoint());
+}
+
+test "ime commit on empty state returns zero" {
+    var state = ImeState.init();
+    try std.testing.expect(state.isEmpty());
+
+    const committed = state.toCodepoint();
+    state.reset();
+
+    try std.testing.expectEqual(@as(u32, 0), committed);
+    try std.testing.expect(state.isEmpty());
+}
+
+test "ime commit on partial syllable returns jamo" {
+    var state = ImeState.init();
+
+    // Type just ㅎ (initial only)
+    _ = processConsonant2Bulsik(&state, 30); // ㅎ
+    try std.testing.expectEqual(@as(u32, 0x314E), state.toCodepoint()); // ㅎ
+
+    const committed = state.toCodepoint();
+    state.reset();
+
+    try std.testing.expectEqual(@as(u32, 0x314E), committed); // ㅎ (single jamo)
+    try std.testing.expect(state.isEmpty());
+}
+
 test "typing 입력할 then backspace should decompose 할" {
     // This test simulates the exact user scenario:
     // Type "입력할" (dlq + fur + gkf in 2-bulsik layout)
@@ -1331,6 +1377,23 @@ export fn wasm_ime_getState(handle: u32, output_ptr: u32) void {
     output[3] = state.medial_flag;
     output[4] = @intCast(state.final);
     output[5] = state.final_flag;
+}
+
+/// Commit current composition
+/// Finalizes the current syllable and resets the IME state
+/// @param handle: IME instance pointer
+/// @returns The codepoint of the finalized syllable (0 if empty)
+export fn wasm_ime_commit(handle: u32) u32 {
+    if (handle == 0) return 0;
+    const state: *ImeState = @ptrFromInt(handle);
+
+    // Get current codepoint before reset
+    const codepoint = state.toCodepoint();
+
+    // Reset state for next composition
+    state.reset();
+
+    return codepoint;
 }
 
 // Build configuration comment:

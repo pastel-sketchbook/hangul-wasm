@@ -3,7 +3,7 @@
 This document tracks planned enhancements, known issues, and future work for the hangul-wasm library.
 
 **Current Version**: v0.3.0  
-**Test Status**: 32 tests (31 passed, 1 skipped)  
+**Test Status**: 35 tests (34 passed, 1 skipped)  
 **WASM Size**: 4.4KB (ReleaseSmall)
 
 ---
@@ -42,7 +42,7 @@ This document tracks planned enhancements, known issues, and future work for the
 ### IME Improvements
 
 - [x] **Fix double final consonant splitting** - Fixed: when a double final (e.g., ㄺ) splits on vowel input, first component stays as final, second becomes new initial (닭+ㅏ→달가)
-- [ ] **Add `wasm_ime_commit()`** - Explicit function to finalize current composition without space key
+- [x] **Add `wasm_ime_commit()`** - Added explicit function to finalize current composition and reset state
 - [ ] **Improve composition overlay** - Currently disabled in `hangul-ime.js` (lines 65, 71, 93, etc.)
 
 ---

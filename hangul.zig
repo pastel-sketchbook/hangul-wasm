@@ -72,14 +72,25 @@ fn ohiIndexToSingleJamo(idx: i8) u32 {
     return 0x3130 + @as(u32, @intCast(idx));
 }
 
-// Jamo decomposition result
+/// Result of decomposing a Hangul syllable into jamo components.
+/// All values are Unicode compatibility jamo code points (U+3131-U+3163).
 pub const JamoDecomp = struct {
+    /// Initial consonant (초성): U+3131-U+314E (ㄱ-ㅎ)
     initial: u32,
+    /// Medial vowel (중성): U+314F-U+3163 (ㅏ-ㅣ)
     medial: u32,
+    /// Final consonant (종성): U+3131-U+314E or 0 if none (받침)
     final: u32,
 };
 
-// Check if character is a Hangul syllable
+/// Check if a Unicode code point is a Hangul syllable (가-힣).
+/// Valid range: U+AC00 to U+D7A3 (11,172 syllables).
+///
+/// Example:
+/// ```zig
+/// isHangulSyllable(0xD55C) // '한' → true
+/// isHangulSyllable(0x0041) // 'A' → false
+/// ```
 pub fn isHangulSyllable(c: u32) bool {
     return c >= HANGUL_SYLLABLE_BASE and c <= HANGUL_SYLLABLE_END;
 }
@@ -127,7 +138,20 @@ pub fn isDoubleVowel(c: u32) bool {
     return false;
 }
 
-// Decompose Hangul syllable into jamo components
+/// Decompose a Hangul syllable into its constituent jamo components.
+///
+/// Takes a precomposed Hangul syllable (U+AC00–U+D7A3) and returns its
+/// initial consonant (초성), medial vowel (중성), and final consonant (종성).
+///
+/// Returns `null` if the input is not a valid Hangul syllable.
+///
+/// Example:
+/// ```zig
+/// const jamo = decompose(0xD55C); // '한' (U+D55C)
+/// // jamo.initial = 0x314E (ㅎ)
+/// // jamo.medial  = 0x314F (ㅏ)
+/// // jamo.final   = 0x3134 (ㄴ)
+/// ```
 pub fn decompose(syllable: u32) ?JamoDecomp {
     if (!isHangulSyllable(syllable)) return null;
 
@@ -143,7 +167,22 @@ pub fn decompose(syllable: u32) ?JamoDecomp {
     };
 }
 
-// Compose jamo components into Hangul syllable
+/// Compose jamo components into a precomposed Hangul syllable.
+///
+/// Takes compatibility jamo code points for initial (초성), medial (중성),
+/// and final (종성) consonants and returns the composed syllable.
+/// Pass 0 for `final` if the syllable has no final consonant.
+///
+/// Returns `null` if any jamo is invalid or cannot form a valid syllable.
+///
+/// Example:
+/// ```zig
+/// const syllable = compose(0x314E, 0x314F, 0x3134); // ㅎ + ㅏ + ㄴ
+/// // syllable = 0xD55C ('한')
+///
+/// const ga = compose(0x3131, 0x314F, 0); // ㄱ + ㅏ + (none)
+/// // ga = 0xAC00 ('가')
+/// ```
 pub fn compose(initial: u32, medial: u32, final: u32) ?u32 {
     var initial_idx: ?u32 = null;
     var medial_idx: ?u32 = null;
@@ -188,59 +227,110 @@ pub fn compose(initial: u32, medial: u32, final: u32) ?u32 {
     return syllable;
 }
 
-// Check if character has final jamo (받침)
+/// Check if a Hangul syllable has a final consonant (받침).
+///
+/// Returns `true` if the syllable has a final jamo, `false` otherwise.
+/// Returns `false` for non-Hangul characters.
+///
+/// Example:
+/// ```zig
+/// hasFinal(0xD55C) // '한' → true (has ㄴ)
+/// hasFinal(0xAC00) // '가' → false (no final)
+/// ```
 pub fn hasFinal(syllable: u32) bool {
     if (!isHangulSyllable(syllable)) return false;
     const syllable_index = syllable - HANGUL_SYLLABLE_BASE;
     return (syllable_index % FINAL_COUNT) != 0;
 }
 
-// Get initial jamo
+/// Get the initial consonant (초성) of a Hangul syllable.
+///
+/// Returns the compatibility jamo code point for the initial consonant,
+/// or `null` if the input is not a valid Hangul syllable.
+///
+/// Example:
+/// ```zig
+/// getInitial(0xD55C) // '한' → 0x314E (ㅎ)
+/// ```
 pub fn getInitial(syllable: u32) ?u32 {
     const jamo = decompose(syllable);
     return if (jamo) |j| j.initial else null;
 }
 
-// Get medial jamo
+/// Get the medial vowel (중성) of a Hangul syllable.
+///
+/// Returns the compatibility jamo code point for the medial vowel,
+/// or `null` if the input is not a valid Hangul syllable.
+///
+/// Example:
+/// ```zig
+/// getMedial(0xD55C) // '한' → 0x314F (ㅏ)
+/// ```
 pub fn getMedial(syllable: u32) ?u32 {
     const jamo = decompose(syllable);
     return if (jamo) |j| j.medial else null;
 }
 
-// Get final jamo
+/// Get the final consonant (종성) of a Hangul syllable.
+///
+/// Returns the compatibility jamo code point for the final consonant,
+/// or 0 if the syllable has no final, or `null` if not a valid syllable.
+///
+/// Example:
+/// ```zig
+/// getFinal(0xD55C) // '한' → 0x3134 (ㄴ)
+/// getFinal(0xAC00) // '가' → 0 (no final)
+/// ```
 pub fn getFinal(syllable: u32) ?u32 {
     const jamo = decompose(syllable);
     return if (jamo) |j| j.final else null;
 }
 
-// WASM exports
+// ============================================================================
+// WASM Exports - Core Functions
+// ============================================================================
+
+/// WASM export: Check if code point is a Hangul syllable.
+/// Returns 1 (true) or 0 (false).
 export fn wasm_isHangulSyllable(c: u32) bool {
     return isHangulSyllable(c);
 }
 
+/// WASM export: Check if syllable has a final consonant (받침).
+/// Returns 1 (true) or 0 (false).
 export fn wasm_hasFinal(c: u32) bool {
     return hasFinal(c);
 }
 
+/// WASM export: Get initial consonant (초성) of a syllable.
+/// Returns the jamo code point, or 0 if invalid input.
 export fn wasm_getInitial(c: u32) u32 {
     return getInitial(c) orelse 0;
 }
 
+/// WASM export: Get medial vowel (중성) of a syllable.
+/// Returns the jamo code point, or 0 if invalid input.
 export fn wasm_getMedial(c: u32) u32 {
     return getMedial(c) orelse 0;
 }
 
+/// WASM export: Get final consonant (종성) of a syllable.
+/// Returns the jamo code point, 0 if no final, or 0 if invalid.
 export fn wasm_getFinal(c: u32) u32 {
     return getFinal(c) orelse 0;
 }
 
+/// WASM export: Compose jamo into a Hangul syllable.
+/// Returns the syllable code point, or 0 if invalid jamo.
 export fn wasm_compose(initial: u32, medial: u32, final: u32) u32 {
     return compose(initial, medial, final) orelse 0;
 }
 
-// Decompose into array: returns initial, medial, final
-// NOTE: Caller MUST allocate at least 3 u32 values (12 bytes) for output buffer
-// Takes byte offset into WASM linear memory
+/// WASM export: Decompose syllable into jamo array.
+///
+/// Writes initial, medial, final to output buffer (3 × u32 = 12 bytes).
+/// Caller MUST allocate at least 12 bytes at output_ptr.
+/// Returns true on success, false if not a valid Hangul syllable.
 export fn wasm_decompose(syllable: u32, output_ptr: u32) bool {
     const jamo = decompose(syllable);
     if (jamo) |j| {
@@ -254,30 +344,39 @@ export fn wasm_decompose(syllable: u32, output_ptr: u32) bool {
     return false;
 }
 
-// Jamo classification exports
+// ============================================================================
+// WASM Exports - Jamo Classification
+// ============================================================================
+
+/// WASM export: Check if code point is a compatibility jamo.
 export fn wasm_isJamo(c: u32) bool {
     return isJamo(c);
 }
 
+/// WASM export: Check if code point is a consonant.
 export fn wasm_isConsonant(c: u32) bool {
     return isConsonant(c);
 }
 
+/// WASM export: Check if code point is a vowel.
 export fn wasm_isVowel(c: u32) bool {
     return isVowel(c);
 }
 
+/// WASM export: Check if code point is a double consonant.
 export fn wasm_isDoubleConsonant(c: u32) bool {
     return isDoubleConsonant(c);
 }
 
+/// WASM export: Check if code point is a double vowel.
 export fn wasm_isDoubleVowel(c: u32) bool {
     return isDoubleVowel(c);
 }
 
-// Safe decompose with buffer size validation
-// Returns: true on success, false if syllable invalid or buffer too small
-// Takes byte offset into WASM linear memory
+/// WASM export: Safe decompose with buffer size validation.
+///
+/// Like wasm_decompose, but validates output_size >= 3.
+/// Returns false if syllable invalid OR buffer too small.
 export fn wasm_decompose_safe(syllable: u32, output_ptr: u32, output_size: u32) bool {
     // Require at least 3 u32 slots (12 bytes)
     if (output_size < 3) return false;
@@ -348,15 +447,22 @@ fn composeString(input: [*]const u32, input_len: usize, output: [*]u32) u32 {
     return out_idx;
 }
 
-/// WASM export for composeString
+/// WASM export: Compose jamo array back into Hangul syllables.
+///
+/// Takes an array of jamo code points and combines them into syllables.
+/// Non-jamo characters pass through unchanged.
+/// Returns the number of output code points written.
 export fn wasm_composeString(input_ptr: u32, input_len: u32, output_ptr: u32) u32 {
     const input: [*]const u32 = @ptrFromInt(input_ptr);
     const output: [*]u32 = @ptrFromInt(output_ptr);
     return composeString(input, input_len, output);
 }
 
-// String processing - decompose entire string
-// Takes byte offsets into WASM linear memory
+/// WASM export: Decompose UTF-8 string into jamo code points.
+///
+/// Reads UTF-8 bytes and decomposes Hangul syllables into jamo.
+/// Non-Hangul characters pass through unchanged.
+/// Returns the number of output code points written.
 export fn wasm_decomposeString(input_ptr: u32, input_len: u32, output_ptr: u32) u32 {
     const input: [*]const u8 = @ptrFromInt(input_ptr);
     const output: [*]u32 = @ptrFromInt(output_ptr);
@@ -390,12 +496,22 @@ export fn wasm_decomposeString(input_ptr: u32, input_len: u32, output_ptr: u32) 
     return out_idx;
 }
 
-// Helper to decode UTF-8 character
+// ============================================================================
+// UTF-8 Decoding Helpers
+// ============================================================================
+
+/// Result of decoding a single UTF-8 character.
 const Utf8Char = struct {
+    /// Decoded Unicode code point (0 if invalid/incomplete).
     char: u32,
+    /// Number of bytes consumed (0 if invalid/incomplete).
     len: u32,
 };
 
+/// Decode a single UTF-8 character from a byte sequence.
+///
+/// Handles 1-4 byte sequences per UTF-8 spec.
+/// Returns {char=0, len=0} for invalid or incomplete sequences.
 fn decodeUtf8Char(bytes: [*]const u8, start: u32, max_len: u32) Utf8Char {
     if (start >= max_len) return .{ .char = 0, .len = 0 };
 
@@ -445,11 +561,19 @@ fn decodeUtf8Char(bytes: [*]const u8, start: u32, max_len: u32) Utf8Char {
     return .{ .char = c, .len = 4 };
 }
 
+// ============================================================================
+// WASM Memory Allocation
+// ============================================================================
+
 // Simple static buffer allocator for WASM (no threading required)
 const WASM_BUFFER_SIZE = 16 * 1024; // 16KB buffer
 var wasm_buffer: [WASM_BUFFER_SIZE]u8 align(8) = undefined;
 var wasm_alloc_ptr: u32 = 0;
 
+/// WASM export: Allocate memory from the static buffer.
+///
+/// Returns a pointer (byte offset) into WASM linear memory,
+/// or 0 if allocation fails. Memory is 4-byte aligned.
 export fn wasm_alloc(size: u32) u32 {
     // Align to 4 bytes for safe u32 access (required by JavaScript TypedArrays)
     const alignment: u32 = 4;
@@ -465,6 +589,10 @@ export fn wasm_alloc(size: u32) u32 {
     return @intCast(ptr);
 }
 
+/// WASM export: Free allocated memory (no-op for linear allocator).
+///
+/// This is a no-op since we use a simple linear allocator.
+/// For long-running applications, consider resetting the allocator.
 export fn wasm_free(ptr: u32, size: u32) void {
     // For simple linear allocator, we don't do anything
     // In production, use a proper allocator or reset strategy

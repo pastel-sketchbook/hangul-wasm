@@ -4,6 +4,10 @@ A high-performance WebAssembly library for Korean text processing, implemented i
 
 **Source Repository**: https://github.com/pastel-sketchbook/hangul-wasm
 
+![Keyboard Demo](recordings/keyboard-demo.gif)
+
+*Visual keyboard showing "한글을 입력할 수 있어요" being typed with 2-Bulsik layout*
+
 ## About
 
 This is a Zig-based implementation of Korean text processing functionality, compiled to WebAssembly for optimal performance. The original JavaScript library by kwseok provides utilities for decomposing and composing Korean syllables. This port brings those capabilities to WASM while maintaining API compatibility.
@@ -418,6 +422,12 @@ task run:demo         # Build WASM + server, serve demo on localhost:8120
 task run:demo:browse  # Same as above, also opens browser automatically
 ```
 
+Generate the keyboard demo GIF:
+```bash
+task generate:gif     # Record visual keyboard typing "한글을 입력할 수 있어요"
+```
+**Prerequisites for GIF generation:** ffmpeg, Playwright (`bunx playwright install`)
+
 The demo server is a lightweight Zig-based HTTP server (~352KB) built on [http.zig](https://github.com/karlseguin/http.zig). It serves only whitelisted files for security.
 
 The demo includes fallback JavaScript implementation for development. When `hangul.wasm` is available, all decomposition/composition operations automatically use the optimized Zig/WASM module via:
@@ -608,6 +618,7 @@ task build:wasm       # Build optimized WASM
 task build:server     # Build http.zig static file server
 task check:all        # Full quality check
 task pre:commit       # Pre-commit checks (fmt + test)
+task generate:gif     # Generate keyboard demo GIF (requires ffmpeg, Playwright)
 task run:demo         # Build WASM + server, serve interactive demo
 task run:demo:browse  # Build, serve, and open in browser
 task clean            # Remove build artifacts

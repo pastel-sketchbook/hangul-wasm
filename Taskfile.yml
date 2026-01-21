@@ -372,3 +372,31 @@ tasks:
     desc: Show current version
     cmds:
       - cat VERSION
+
+  generate:gif:
+    desc: Generate keyboard demo GIF (requires ffmpeg, Playwright)
+    deps: [build:wasm, build:server]
+    cmds:
+      - |
+        PORT=8120
+        # Kill any existing process on port 8120
+        if command -v lsof &> /dev/null; then
+          PID=$(lsof -t -i :$PORT 2>/dev/null || true)
+          if [ -n "$PID" ]; then
+            kill -9 $PID 2>/dev/null || true
+            sleep 1
+          fi
+        fi
+        
+        # Start server in background
+        ./server/zig-out/bin/hangul-server --port $PORT &
+        SERVER_PID=$!
+        sleep 2
+        
+        # Run the recording script
+        bunx tsx scripts/record-keyboard.ts
+        
+        # Kill the server
+        kill $SERVER_PID 2>/dev/null || true
+        
+        echo "GIF generated at recordings/keyboard-demo.gif"

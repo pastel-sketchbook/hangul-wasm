@@ -37,6 +37,36 @@ pub const COMPAT_FINAL = [_]u32{
     0x314A, 0x314B, 0x314C, 0x314D, 0x314E,
 };
 
+// Reverse lookup tables for O(1) compose() - generated at comptime
+// Maps Unicode codepoint to array index (0xFF = invalid)
+const JAMO_LOOKUP_SIZE = 0x3164 - 0x3131 + 1; // U+3131 to U+3163 inclusive (51 entries)
+
+const INITIAL_REVERSE = blk: {
+    var table: [JAMO_LOOKUP_SIZE]u8 = [_]u8{0xFF} ** JAMO_LOOKUP_SIZE;
+    for (COMPAT_INITIAL, 0..) |cp, i| {
+        table[cp - 0x3131] = @intCast(i);
+    }
+    break :blk table;
+};
+
+const MEDIAL_REVERSE = blk: {
+    var table: [JAMO_LOOKUP_SIZE]u8 = [_]u8{0xFF} ** JAMO_LOOKUP_SIZE;
+    for (COMPAT_MEDIAL, 0..) |cp, i| {
+        table[cp - 0x3131] = @intCast(i);
+    }
+    break :blk table;
+};
+
+const FINAL_REVERSE = blk: {
+    var table: [JAMO_LOOKUP_SIZE]u8 = [_]u8{0xFF} ** JAMO_LOOKUP_SIZE;
+    for (COMPAT_FINAL, 0..) |cp, i| {
+        if (cp != 0) { // Skip the null entry
+            table[cp - 0x3131] = @intCast(i);
+        }
+    }
+    break :blk table;
+};
+
 // Index mapping tables for ohi.js compatibility
 // ohi.js uses custom indices (1-30 for consonants, 31-51 for vowels)
 // These need conversion to array indices for COMPAT_INITIAL/MEDIAL/FINAL
@@ -190,45 +220,30 @@ pub fn decompose(syllable: u32) ?JamoDecomp {
 /// // ga = 0xAC00 ('가')
 /// ```
 pub fn compose(initial: u32, medial: u32, final: u32) ?u32 {
-    var initial_idx: ?u32 = null;
-    var medial_idx: ?u32 = null;
-    var final_idx: ?u32 = null;
+    // O(1) lookup using comptime-generated reverse tables
+    const base: u32 = 0x3131;
 
-    // Find initial index
-    for (COMPAT_INITIAL, 0..) |jamo, i| {
-        if (jamo == initial) {
-            initial_idx = @intCast(i);
-            break;
-        }
+    // Bounds check for jamo range
+    if (initial < base or initial >= base + JAMO_LOOKUP_SIZE) return null;
+    if (medial < base or medial >= base + JAMO_LOOKUP_SIZE) return null;
+
+    const initial_idx = INITIAL_REVERSE[initial - base];
+    const medial_idx = MEDIAL_REVERSE[medial - base];
+
+    if (initial_idx == 0xFF or medial_idx == 0xFF) return null;
+
+    // Handle final: 0 means no final consonant
+    var final_idx: u8 = 0;
+    if (final != 0) {
+        if (final < base or final >= base + JAMO_LOOKUP_SIZE) return null;
+        final_idx = FINAL_REVERSE[final - base];
+        if (final_idx == 0xFF) return null;
     }
-
-    // Find medial index
-    for (COMPAT_MEDIAL, 0..) |jamo, i| {
-        if (jamo == medial) {
-            medial_idx = @intCast(i);
-            break;
-        }
-    }
-
-    // Find final index - must be 0 or found in COMPAT_FINAL
-    if (final == 0) {
-        final_idx = 0;
-    } else {
-        for (COMPAT_FINAL, 0..) |jamo, i| {
-            if (jamo == final) {
-                final_idx = @intCast(i);
-                break;
-            }
-        }
-    }
-
-    // Validate all indices found (including final)
-    if (initial_idx == null or medial_idx == null or final_idx == null) return null;
 
     const syllable = HANGUL_SYLLABLE_BASE +
-        (initial_idx.? * MEDIAL_COUNT * FINAL_COUNT) +
-        (medial_idx.? * FINAL_COUNT) +
-        final_idx.?;
+        (@as(u32, initial_idx) * MEDIAL_COUNT * FINAL_COUNT) +
+        (@as(u32, medial_idx) * FINAL_COUNT) +
+        @as(u32, final_idx);
 
     return syllable;
 }

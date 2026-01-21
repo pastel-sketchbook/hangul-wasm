@@ -2,9 +2,9 @@
 
 This document tracks planned enhancements, known issues, and future work for the hangul-wasm library.
 
-**Current Version**: v0.5.4  
-**Test Status**: 58 tests (57 passed, 1 skipped)  
-**WASM Size**: 4.9KB (ReleaseSmall)
+**Current Version**: v0.6.1  
+**Test Status**: 58 unit tests + 13 e2e tests  
+**WASM Size**: ~6.7KB (ReleaseSmall)
 
 ---
 
@@ -98,7 +98,7 @@ This document tracks planned enhancements, known issues, and future work for the
 
 - [ ] **SIMD for bulk operations** - Use WASM SIMD for batch decomposition (if browser support allows)
 - [ ] **Streaming composition API** - Progressive character-by-character composition for large texts
-- [ ] **Optimize `compose()` lookup** - Consider hash map or binary search for jamo lookup (currently O(68) linear search)
+- [x] **Optimize `compose()` lookup** - Replaced O(68) linear search with O(1) comptime reverse lookup tables
 
 ### Platform Support
 
@@ -138,7 +138,8 @@ This document tracks planned enhancements, known issues, and future work for the
 
 ### Refactoring
 
-- [ ] **Extract IME module** - Move IME code to separate `ime.zig` file for clarity
+- [x] **Extract IME module** - Moved IME code to separate `ime.zig` file (v0.6.0)
+- [x] **Optimize compose() lookup** - Replaced O(68) linear search with O(1) comptime reverse lookup tables (v0.6.2)
 - [ ] **Consolidate index mapping** - `ohiIndexToInitialIdx`, `ohiIndexToMedialIdx`, `ohiIndexToFinalIdx` could use a unified approach
 - [ ] **Add error enum** - Replace `?T` returns with proper error types for better debugging
 
@@ -158,10 +159,10 @@ This document tracks planned enhancements, known issues, and future work for the
 
 ## Technical Debt
 
-- [ ] **LAYOUT_2BULSIK duplication** - Layout defined in both Zig (hangul.zig:804-814) and JS (hangul-ime.js:12-23)
-- [ ] **Magic numbers** - Some numeric constants lack named definitions (e.g., 31 for vowel threshold)
-- [ ] **Unused code paths** - `LAYOUT_2BULSIK` constant in Zig appears unused after refactor
-- [ ] **Composition overlay** - Feature disabled but code remains (hangul-ime.js:96-138)
+- [x] **LAYOUT_2BULSIK duplication** - Removed unused Zig constant; layout now only in JS (v0.5.5)
+- [x] **Magic numbers** - Added OHI_VOWEL_BASE and OHI_JAMO_OFFSET constants (v0.5.5)
+- [x] **Unused code paths** - Removed unused LAYOUT_2BULSIK constant from Zig (v0.5.5)
+- [x] **Composition overlay** - Removed disabled overlay code (v0.5.6)
 
 ---
 

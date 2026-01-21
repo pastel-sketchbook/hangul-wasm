@@ -24,7 +24,7 @@ This library uses a **hybrid WASM + JavaScript architecture**:
 
 **Why WASM:**
 - **Performance**: O(1) algorithmic operations compiled to native code
-- **Size**: 6.5KB optimized binary (vs ~50KB JavaScript equivalent)
+- **Size**: ~7KB optimized binary (vs ~50KB JavaScript equivalent)
 - **Type safety**: Zig's compile-time guarantees prevent runtime errors
 
 ### UI Integration Layer (JavaScript - `hangul-ime.js`)
@@ -198,7 +198,7 @@ zig build-obj hangul.zig -target wasm32-freestanding -O Debug
 
 ### Build Profiles
 
-- **ReleaseSmall** (6.5 KB): Optimized binary size, ideal for web distribution
+- **ReleaseSmall** (~7 KB): Optimized binary size, ideal for web distribution
 - **ReleaseFast** (97 KB): Optimized runtime performance
 - **Debug**: Full debug information for development
 
@@ -532,12 +532,15 @@ hangul.wasm_free(outPtr, outputSize);
 - **wasm_alloc(size)**: Returns byte offset into WASM linear memory, or 0 on failure
   - Check return value: `if (ptr === 0) { handle error }`
   - Size in bytes (not elements)
-  - Uses simple 16KB static buffer allocator (linear allocation)
+  - Uses 16KB bump allocator with auto-reset capability
 
-- **wasm_free(ptr, size)**: No-op in current implementation
-  - Simple linear allocator doesn't reclaim memory
-  - Safe to call (for API compatibility)
-  - For production use, consider reset strategy or proper allocator
+- **wasm_free(ptr, size)**: Decrements allocation count; auto-resets when all freed
+  - Tracks active allocation count
+  - When count reaches 0, allocator resets automatically
+  - Safe for bounded session usage (e.g., per-page-load)
+
+- **wasm_alloc_reset()**: Force-reset allocator (invalidates all pointers)
+  - Use for explicit cleanup (e.g., on page unload)
 
 - **Output Buffer Sizing**:
   - `wasm_decompose`: Allocate exactly 12 bytes (3 × u32)
@@ -546,7 +549,7 @@ hangul.wasm_free(outPtr, outputSize);
     - Output: One code point per Hangul jamo + non-Hangul chars
     - Worst case: All Hangul with finals (3 jamo per char) = input.length * 3 code points * 4 bytes
 
-The WASM module uses a simple 16KB static buffer allocator for memory management.
+The WASM module uses a 16KB bump allocator with auto-reset capability for memory management. When all allocations are freed, the allocator automatically resets for reuse.
 
 ## Performance Characteristics
 
@@ -562,13 +565,13 @@ The WASM module uses a simple 16KB static buffer allocator for memory management
 Run `task benchmark` to compare WASM vs pure JavaScript performance:
 
 ```
-Single Operations (per-keystroke IME use case):
-  isHangulSyllable:  WASM 1.1x faster  (50M ops/sec vs 45M ops/sec)
-  decompose:         WASM 1.7x faster  (35M ops/sec vs 21M ops/sec)
-  compose:           WASM 1.8x faster  (30M ops/sec vs 17M ops/sec)
+Single Operations (100K iterations, per-keystroke IME use case):
+  isHangulSyllable:  WASM 1.9x faster  (27M ops/sec vs 14M ops/sec)
+  decompose:         WASM 1.7x faster  (34M ops/sec vs 21M ops/sec)
+  compose:           WASM 1.8x faster  (31M ops/sec vs 17M ops/sec)
 
 Bulk Operations (11,172 syllables):
-  JavaScript can be faster due to WASM function call overhead
+  JavaScript can be faster due to WASM function call overhead (0.67x)
 ```
 
 **Recommendation:** Use WASM for interactive IME (single operations per keystroke). For batch processing of large texts, benchmark both approaches for your specific use case.

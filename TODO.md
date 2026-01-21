@@ -64,7 +64,7 @@ This document tracks planned enhancements, known issues, and future work for the
 
 - [x] **Bulk string composition** - Added `composeString` / `wasm_composeString` (inverse of decompose)
 
-- [ ] **Unicode normalization** - Support NFC/NFD normalization for Hangul strings
+- ~~**Unicode normalization**~~ - Out of scope; browser APIs (`String.normalize()`) handle this
 
 ### Memory Management
 
@@ -170,7 +170,7 @@ This document tracks planned enhancements, known issues, and future work for the
 
 - [ ] **Investigate Hangul Jamo vs Compatibility Jamo** - Consider supporting both output formats
 - [ ] **Korean romanization** - McCune-Reischauer or Revised Romanization conversion
-- [ ] **Hanja (Chinese characters)** - Hangul to Hanja conversion lookup
+- ~~**Hanja (Chinese characters)**~~ - Out of scope; requires large dictionary data, different domain
 - [ ] **Text-to-speech integration** - Phonetic analysis for Korean TTS
 
 ---

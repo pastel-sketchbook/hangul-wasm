@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build & Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.15.0
+      
+      - name: Run tests
+        run: zig build test
+      
+      - name: Build WASM (ReleaseSmall)
+        run: |
+          zig build --release=small
+          cp zig-out/bin/hangul.wasm hangul.wasm
+      
+      - name: Build WASM (ReleaseFast)
+        run: |
+          zig build --release=fast
+          cp zig-out/bin/hangul.wasm hangul-fast.wasm
+      
+      - name: Show WASM sizes
+        run: ls -lh *.wasm
+      
+      - name: Get version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ steps.version.outputs.version }}
+          body: |
+            ## hangul-wasm ${{ steps.version.outputs.version }}
+            
+            High-performance Korean Hangul text processing library using WebAssembly.
+            
+            ### Downloads
+            - `hangul.wasm` - Optimized for size (ReleaseSmall)
+            - `hangul-fast.wasm` - Optimized for speed (ReleaseFast)
+            - `hangul-ime.js` - JavaScript IME integration
+            - `hangul-ime.d.ts` - TypeScript definitions
+            
+            ### Installation
+            ```bash
+            bun add hangul-wasm
+            # or
+            npm install hangul-wasm
+            ```
+          files: |
+            hangul.wasm
+            hangul-fast.wasm
+            hangul-ime.js
+            hangul-ime.d.ts
+          draft: false
+          prerelease: false

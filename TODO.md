@@ -75,7 +75,7 @@ This document tracks planned enhancements, known issues, and future work for the
 
 - [x] **Add release tasks to Taskfile** - Added `release:patch`, `release:minor`, `release:major` with VERSION file
 - [x] **GitHub Actions CI** - Added `.github/workflows/ci.yml` for automated testing and WASM build
-- [ ] **Pre-built WASM releases** - Publish `.wasm` files to GitHub releases
+- [x] **Pre-built WASM releases** - Added `.github/workflows/release.yml` to publish WASM on version tags
 - [ ] **CDN distribution** - Publish to unpkg or jsdelivr for direct browser usage
 
 ---

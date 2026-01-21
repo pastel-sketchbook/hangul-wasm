@@ -1,6 +1,6 @@
 {
   "name": "hangul-wasm",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "High-performance Korean Hangul text processing library using WebAssembly",
   "type": "module",
   "main": "hangul-ime.js",

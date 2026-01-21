@@ -20,6 +20,7 @@
   "scripts": {
     "build": "task build:wasm",
     "test": "task test",
+    "test:e2e": "playwright test",
     "check": "task check:all",
     "prepublishOnly": "task build:wasm"
   },
@@ -47,6 +48,8 @@
   },
   "homepage": "https://github.com/pastel-sketchbook/hangul-wasm#readme",
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^25.0.9",
     "typescript": "~5.9.0"
   }
 }

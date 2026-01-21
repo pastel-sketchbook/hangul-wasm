@@ -2,7 +2,7 @@
 
 This document tracks planned enhancements, known issues, and future work for the hangul-wasm library.
 
-**Current Version**: v0.5.1  
+**Current Version**: v0.5.4  
 **Test Status**: 58 tests (57 passed, 1 skipped)  
 **WASM Size**: 4.9KB (ReleaseSmall)
 
@@ -36,13 +36,14 @@ This document tracks planned enhancements, known issues, and future work for the
 ### Testing & Quality
 
 - [x] **Fix skipped test** - Added `decompose_safe logic validation (host)` test that validates the same logic without WASM-specific pointer handling
-- [ ] **Add integration tests** - Browser-based tests using Playwright or similar
+- [x] **Add integration tests** - Browser-based tests using Playwright (13 tests covering 2-Bulsik, 3-Bulsik, blur handling, and tools)
 - [ ] **Add performance benchmarks** - Measure and document actual performance vs JavaScript implementations
 
 ### IME Improvements
 
 - [x] **Fix double final consonant splitting** - Fixed: when a double final (e.g., ㄺ) splits on vowel input, first component stays as final, second becomes new initial (닭+ㅏ→달가)
 - [x] **Add `wasm_ime_commit()`** - Added explicit function to finalize current composition and reset state
+- [x] **Fix blur handling** - IME now commits composition when input field loses focus
 - [ ] **Improve composition overlay** - Currently disabled in `hangul-ime.js` (lines 65, 71, 93, etc.)
 
 ---
@@ -121,8 +122,6 @@ This document tracks planned enhancements, known issues, and future work for the
 
 2. **Shift key timing** - Rapid shift+key combinations may not always register the shifted jamo
 
-3. **Focus change handling** - IME state persists across field blur/focus; should commit on blur
-
 ### WASM Memory
 
 1. **Memory exhaustion** - 16KB static buffer can be exhausted in heavy use; no recovery mechanism
@@ -145,7 +144,7 @@ This document tracks planned enhancements, known issues, and future work for the
 
 ### Documentation
 
-- [ ] **Add inline doc comments** - Zig `///` doc comments for all public functions
+- [x] **Add inline doc comments** - Zig `///` doc comments for all public functions
 - [ ] **Code examples in docs** - More comprehensive usage examples in README
 - [ ] **Architecture diagram** - Visual representation of WASM/JS boundary
 

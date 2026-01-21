@@ -21,3 +21,4 @@ ohi.js
 node_modules/
 bun.lockb
 .task/checksum
+test-results

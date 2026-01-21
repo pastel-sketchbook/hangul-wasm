@@ -71,16 +71,37 @@ const FINAL_REVERSE = blk: {
 // ohi.js uses custom indices (1-30 for consonants, 31-51 for vowels)
 // These need conversion to array indices for COMPAT_INITIAL/MEDIAL/FINAL
 
+// Comptime lookup table for initial consonant index conversion
+// Based on ohi.js line 65: i - (i < 3 ? 1 : i < 5 ? 2 : i < 10 ? 4 : i < 20 ? 11 : 12)
+// Note: Not all indices 1-30 are valid ohi indices; invalid entries return 0
+const OHI_INITIAL_TO_IDX = blk: {
+    var table: [31]u8 = [_]u8{0} ** 31;
+    for (1..31) |i| {
+        // Use signed arithmetic to avoid overflow, then saturate to 0 if negative
+        const val: i32 = @intCast(i);
+        const result: i32 = if (val < 3) val - 1 else if (val < 5) val - 2 else if (val < 10) val - 4 else if (val < 20) val - 11 else val - 12;
+        table[i] = if (result >= 0) @intCast(result) else 0;
+    }
+    break :blk table;
+};
+
+// Comptime lookup table for final consonant index conversion
+// Based on ohi.js line 67-68: k - (k < 8 ? 0 : k < 19 ? 1 : k < 25 ? 2 : 3)
+const OHI_FINAL_TO_IDX = blk: {
+    var table: [31]u8 = [_]u8{0} ** 31;
+    for (1..31) |k| {
+        const val: i32 = @intCast(k);
+        const result: i32 = if (val < 8) val else if (val < 19) val - 1 else if (val < 25) val - 2 else val - 3;
+        table[k] = if (result >= 0) @intCast(result) else 0;
+    }
+    break :blk table;
+};
+
 /// Convert ohi.js initial consonant index to COMPAT_INITIAL array index
-/// Based on ohi.js line 65: i - (i < 3 ? 1 : i < 5 ? 2 : i < 10 ? 4 : i < 20 ? 11 : 12)
+/// O(1) lookup using comptime-generated table
 pub fn ohiIndexToInitialIdx(i: i8) u8 {
-    if (i <= 0) return 0;
-    const val: u8 = @intCast(i);
-    if (val < 3) return val - 1;
-    if (val < 5) return val - 2;
-    if (val < 10) return val - 4;
-    if (val < 20) return val - 11;
-    return val - 12;
+    if (i <= 0 or i > 30) return 0;
+    return OHI_INITIAL_TO_IDX[@intCast(i)];
 }
 
 /// Convert ohi.js medial vowel index to COMPAT_MEDIAL array index
@@ -91,14 +112,10 @@ pub fn ohiIndexToMedialIdx(j: i8) u8 {
 }
 
 /// Convert ohi.js final consonant index to COMPAT_FINAL array index
-/// Based on ohi.js line 67-68: k - (k < 8 ? 0 : k < 19 ? 1 : k < 25 ? 2 : 3)
+/// O(1) lookup using comptime-generated table
 pub fn ohiIndexToFinalIdx(k: i8) u8 {
-    if (k <= 0) return 0;
-    const val: u8 = @intCast(k);
-    if (val < 8) return val - 0;
-    if (val < 19) return val - 1;
-    if (val < 25) return val - 2;
-    return val - 3;
+    if (k <= 0 or k > 30) return 0;
+    return OHI_FINAL_TO_IDX[@intCast(k)];
 }
 
 /// Convert ohi.js index to single jamo Unicode code point

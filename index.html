@@ -429,6 +429,98 @@
         border-color: var(--primary);
         box-shadow: 0 0 0 3px rgba(212, 165, 212, 0.15);
       }
+
+      /* Main Tabs */
+      .main-tabs {
+        display: flex;
+        border-bottom: 2px solid var(--border);
+        background: #faf5f8;
+      }
+
+      .main-tab {
+        flex: 1;
+        padding: 1rem 1.5rem;
+        border: none;
+        background: transparent;
+        color: var(--text-light);
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
+      }
+
+      .main-tab:hover {
+        color: var(--text-dark);
+        background: rgba(212, 165, 212, 0.1);
+      }
+
+      .main-tab.active {
+        color: var(--text-dark);
+        border-bottom-color: var(--primary);
+        background: white;
+      }
+
+      .tab-content {
+        display: none;
+        padding: 2rem;
+      }
+
+      .tab-content.active {
+        display: block;
+      }
+
+      /* Keyboard layout styles */
+      .keyboard {
+        font-family: monospace;
+        background: #2d2d3d;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+      }
+
+      .keyboard-row {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 4px;
+        justify-content: center;
+      }
+
+      .key {
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        min-width: 36px;
+        text-align: center;
+      }
+
+      .key.consonant { background: #d4a5d4; color: #3d3d4d; }
+      .key.vowel { background: #c4d9e8; color: #3d3d4d; }
+      .key.final { background: #f0d9c1; color: #3d3d4d; }
+      .key.initial { background: #d4a5d4; color: #3d3d4d; }
+      .key.neutral { background: #4a4a5a; color: #aaa; }
+
+      .legend {
+        display: flex;
+        gap: 1rem;
+        font-size: 0.85rem;
+        color: var(--text-light);
+        margin: 1rem 0;
+        flex-wrap: wrap;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .legend-color {
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+      }
     </style>
   </head>
   <body>
@@ -442,104 +534,165 @@
           <div id="status" class="status loading">Loading...</div>
         </div>
 
-        <!-- IME Section -->
-        <div class="demo-section" id="imeSection" style="display: none;">
-          <div class="section-header">
-            <div class="section-icon">
-              <svg viewBox="0 0 24 24">
-                <path d="M4 7V4h16v3M9 20h6M12 4v16" stroke="currentColor" />
-              </svg>
+        <!-- Main Navigation Tabs -->
+        <div class="main-tabs" id="mainTabs">
+          <button class="main-tab active" onclick="switchMainTab('2bulsik')">2벌식 IME</button>
+          <button class="main-tab" onclick="switchMainTab('3bulsik')">3벌식 IME</button>
+          <button class="main-tab" onclick="switchMainTab('tools')">Tools</button>
+        </div>
+
+        <!-- 2-Bulsik Tab Content -->
+        <div class="tab-content active" id="tab-2bulsik">
+          <h2 style="margin-bottom: 1.5rem; color: var(--text-dark);">2벌식 (Dubeolsik) - Standard Korean Layout</h2>
+          
+          <!-- Keyboard Layout -->
+          <div class="keyboard">
+            <div class="keyboard-row">
+              <span class="key neutral">1</span><span class="key neutral">2</span><span class="key neutral">3</span>
+              <span class="key neutral">4</span><span class="key neutral">5</span><span class="key neutral">6</span>
+              <span class="key neutral">7</span><span class="key neutral">8</span><span class="key neutral">9</span><span class="key neutral">0</span>
             </div>
-            <h2>한글 IME (Input Method Editor)</h2>
+            <div class="keyboard-row">
+              <span class="key consonant" title="q → ㅂ (Shift: ㅃ)">ㅂ</span>
+              <span class="key consonant" title="w → ㅈ (Shift: ㅉ)">ㅈ</span>
+              <span class="key consonant" title="e → ㄷ (Shift: ㄸ)">ㄷ</span>
+              <span class="key consonant" title="r → ㄱ (Shift: ㄲ)">ㄱ</span>
+              <span class="key consonant" title="t → ㅅ (Shift: ㅆ)">ㅅ</span>
+              <span class="key vowel" title="y → ㅛ">ㅛ</span>
+              <span class="key vowel" title="u → ㅕ">ㅕ</span>
+              <span class="key vowel" title="i → ㅑ">ㅑ</span>
+              <span class="key vowel" title="o → ㅐ (Shift: ㅒ)">ㅐ</span>
+              <span class="key vowel" title="p → ㅔ (Shift: ㅖ)">ㅔ</span>
+            </div>
+            <div class="keyboard-row" style="padding-left: 20px;">
+              <span class="key consonant" title="a → ㅁ">ㅁ</span>
+              <span class="key consonant" title="s → ㄴ">ㄴ</span>
+              <span class="key consonant" title="d → ㅇ">ㅇ</span>
+              <span class="key consonant" title="f → ㄹ">ㄹ</span>
+              <span class="key consonant" title="g → ㅎ">ㅎ</span>
+              <span class="key vowel" title="h → ㅗ">ㅗ</span>
+              <span class="key vowel" title="j → ㅓ">ㅓ</span>
+              <span class="key vowel" title="k → ㅏ">ㅏ</span>
+              <span class="key vowel" title="l → ㅣ">ㅣ</span>
+            </div>
+            <div class="keyboard-row" style="padding-left: 40px;">
+              <span class="key consonant" title="z → ㅋ">ㅋ</span>
+              <span class="key consonant" title="x → ㅌ">ㅌ</span>
+              <span class="key consonant" title="c → ㅊ">ㅊ</span>
+              <span class="key consonant" title="v → ㅍ">ㅍ</span>
+              <span class="key vowel" title="b → ㅠ">ㅠ</span>
+              <span class="key vowel" title="n → ㅜ">ㅜ</span>
+              <span class="key vowel" title="m → ㅡ">ㅡ</span>
+            </div>
           </div>
-          <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
-            <button id="imeToggle" onclick="toggleIme()" style="width: auto; margin: 0; padding: 0.75rem 1.5rem; font-size: 0.9rem;">
+          
+          <div class="legend">
+            <span class="legend-item"><span class="legend-color" style="background: #d4a5d4;"></span>Consonants (자음)</span>
+            <span class="legend-item"><span class="legend-color" style="background: #c4d9e8;"></span>Vowels (모음)</span>
+            <span style="margin-left: auto; font-weight: 600;">Shift: ㅃㅉㄸㄲㅆㅒㅖ</span>
+          </div>
+
+          <!-- IME Controls -->
+          <div style="display: flex; align-items: center; gap: 1rem; margin: 1.5rem 0; flex-wrap: wrap;">
+            <button id="imeToggle2" onclick="toggleIme()" style="width: auto; margin: 0; padding: 0.75rem 1.5rem; font-size: 0.9rem;">
               Enable IME
             </button>
-            <button id="debugToggle" onclick="toggleDebug()" style="width: auto; margin: 0; padding: 0.75rem 1.5rem; font-size: 0.9rem; background: var(--text-light); color: white;">
+            <button id="debugToggle2" onclick="toggleDebug()" style="width: auto; margin: 0; padding: 0.75rem 1.5rem; font-size: 0.9rem; background: var(--text-light); color: white;">
               Debug: OFF
             </button>
-            <span id="imeStatus" style="font-weight: 600; color: var(--text-light);">
-              Press <kbd style="background: #e8e8f0; padding: 0.25rem 0.5rem; border-radius: 4px; font-family: monospace;">Shift+Space</kbd> to toggle
+            <span id="imeStatus2" style="font-weight: 600; color: var(--text-light);">
+              <kbd style="background: #e8e8f0; padding: 0.25rem 0.5rem; border-radius: 4px; font-family: monospace;">Shift+Space</kbd> to toggle
             </span>
           </div>
-          <label class="label">Type Korean using 2-Bulsik (Dubeolsik) layout:</label>
-          <textarea
-            id="imeInput"
-            placeholder="Try: gksrmf (한글), dkssud (안녕)"
-            style="min-height: 150px; font-size: 1.2rem;"
-          ></textarea>
           
-          <!-- Composition Overlay - DISABLED for now -->
-          <!--
-          <div id="compositionOverlay" style="
-            margin-top: 1rem;
-            padding: 1rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 8px;
-            color: white;
-            font-family: monospace;
-            display: none;
-          ">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <div style="font-size: 0.75rem; opacity: 0.9; margin-bottom: 0.25rem;">Keys pressed:</div>
-                <div id="keysPressed" style="font-size: 1.1rem; font-weight: 600; letter-spacing: 0.1em;">—</div>
-              </div>
-              <div style="text-align: right;">
-                <div style="font-size: 0.75rem; opacity: 0.9; margin-bottom: 0.25rem;">Current composition:</div>
-                <div id="currentComposition" style="font-size: 2rem; font-weight: 700;">—</div>
-              </div>
-            </div>
-          </div>
-          -->
+          <textarea id="imeInput" placeholder="Try: gksrmf → 한글, dkssud → 안녕, Rkr → 까" style="min-height: 120px; font-size: 1.2rem;"></textarea>
           
-          <div class="info">
-            <strong>Standard 2-Bulsik (Dubeolsik) Layout:</strong><br>
-            This is the authentic Korean keyboard layout used in Korea.<br>
-            <br>
-            <strong>Consonants (left hand):</strong><br>
-            q(ㅂ) w(ㅈ) e(ㄷ) r(ㄱ) t(ㅅ) / a(ㅁ) s(ㄴ) d(ㅇ) f(ㄹ) g(ㅎ) / z(ㅋ) x(ㅌ) c(ㅊ) v(ㅍ)<br>
-            <br>
-            <strong>Vowels (right hand):</strong><br>
-            y(ㅛ) u(ㅕ) i(ㅑ) o(ㅐ) p(ㅔ) / h(ㅗ) j(ㅓ) k(ㅏ) l(ㅣ) / b(ㅠ) n(ㅜ) m(ㅡ)<br>
-            <br>
-            <strong>Double consonants (Shift):</strong><br>
-            Q(ㅃ) W(ㅉ) E(ㄸ) R(ㄲ) T(ㅆ)<br>
-            <br>
-            <strong>Examples:</strong><br>
-            • <code>gksrmf</code> → 한글 (Korean)<br>
-            • <code>dkssud</code> → 안녕 (hello)<br>
-            • <code>Rkr</code> → 까 (double ㄱ + ㅏ)<br>
-            <br>
-            • Backspace decomposes syllables step-by-step (한 → 하 → ㅎ)<br>
-            • Compound vowels form automatically (ㅗ+ㅏ → ㅘ, ㅜ+ㅓ → ㅝ)
-          </div>
-          <div id="imeDebug" style="margin-top: 1rem; padding: 1rem; background: #f8f8fa; border-radius: 8px; font-family: monospace; font-size: 0.85rem; color: var(--text-light); display: none;">
-            <div>State: <span id="imeStateDisplay">—</span></div>
+          <div class="info" style="margin-top: 1rem;">
+            <strong>Tips:</strong> Consonants on left hand, vowels on right · Shift for double consonants (ㄲㄸㅃㅆㅉ) · 
+            Compound vowels auto-form (ㅗ+ㅏ→ㅘ) · Backspace decomposes step-by-step
           </div>
         </div>
 
-        <!-- Decompose Section -->
-        <div class="demo-section">
-          <div class="section-header">
-            <div class="section-icon">
-              <svg viewBox="0 0 24 24">
-                <path
-                  d="M3 12h18M12 3v18"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  fill="none"
-                />
-              </svg>
+        <!-- 3-Bulsik Tab Content -->
+        <div class="tab-content" id="tab-3bulsik">
+          <h2 style="margin-bottom: 1.5rem; color: var(--text-dark);">3벌식 (Sebeolsik) - Three-Set Layout</h2>
+          
+          <!-- Keyboard Layout -->
+          <div class="keyboard">
+            <div class="keyboard-row">
+              <span class="key final" title="1 → ㅎ (final)">ㅎ</span>
+              <span class="key final" title="2 → ㅆ (final)">ㅆ</span>
+              <span class="key final" title="3 → ㅂ (final)">ㅂ</span>
+              <span class="key neutral">4</span><span class="key neutral">5</span><span class="key neutral">6</span>
+              <span class="key neutral">7</span><span class="key neutral">8</span><span class="key neutral">9</span><span class="key neutral">0</span>
             </div>
-            <h2>Decompose (Syllable → Jamo)</h2>
+            <div class="keyboard-row">
+              <span class="key final" title="q → ㅅ (final)">ㅅ</span>
+              <span class="key final" title="w → ㄹ (final)">ㄹ</span>
+              <span class="key vowel" title="e → ㅕ">ㅕ</span>
+              <span class="key vowel" title="r → ㅓ">ㅓ</span>
+              <span class="key vowel" title="t → ㅡ">ㅡ</span>
+              <span class="key initial" title="y → ㅈ (initial)">ㅈ</span>
+              <span class="key initial" title="u → ㄷ (initial)">ㄷ</span>
+              <span class="key initial" title="i → ㅁ (initial)">ㅁ</span>
+              <span class="key initial" title="o → ㅊ (initial)">ㅊ</span>
+              <span class="key initial" title="p → ㅍ (initial)">ㅍ</span>
+            </div>
+            <div class="keyboard-row" style="padding-left: 20px;">
+              <span class="key vowel" title="a → ㅗ">ㅗ</span>
+              <span class="key vowel" title="s → ㅏ">ㅏ</span>
+              <span class="key vowel" title="d → ㅣ">ㅣ</span>
+              <span class="key vowel" title="f → ㅏ">ㅏ</span>
+              <span class="key vowel" title="g → ㅜ">ㅜ</span>
+              <span class="key initial" title="h → ㄴ (initial)">ㄴ</span>
+              <span class="key initial" title="j → ㅇ (initial)">ㅇ</span>
+              <span class="key initial" title="k → ㄱ (initial)">ㄱ</span>
+              <span class="key initial" title="l → ㅅ (initial)">ㅅ</span>
+            </div>
+            <div class="keyboard-row" style="padding-left: 40px;">
+              <span class="key vowel" title="z → ㅠ">ㅠ</span>
+              <span class="key final" title="x → ㄴ (final)">ㄴ</span>
+              <span class="key vowel" title="c → ㅔ">ㅔ</span>
+              <span class="key final" title="v → ㄱ (final)">ㄱ</span>
+              <span class="key vowel" title="b → ㅠ">ㅠ</span>
+              <span class="key initial" title="n → ㅎ (initial)">ㅎ</span>
+              <span class="key initial" title="m → ㅎ (initial)">ㅎ</span>
+            </div>
+          </div>
+          
+          <div class="legend">
+            <span class="legend-item"><span class="legend-color" style="background: #d4a5d4;"></span>Initial (초성)</span>
+            <span class="legend-item"><span class="legend-color" style="background: #c4d9e8;"></span>Medial (중성)</span>
+            <span class="legend-item"><span class="legend-color" style="background: #f0d9c1;"></span>Final (종성)</span>
           </div>
 
-      <!-- Content -->
-      <div class="content">
-        <!-- Decompose Section -->
-        <div class="demo-section">
+          <!-- IME Controls -->
+          <div style="display: flex; align-items: center; gap: 1rem; margin: 1.5rem 0; flex-wrap: wrap;">
+            <button id="imeToggle3" onclick="toggleIme()" style="width: auto; margin: 0; padding: 0.75rem 1.5rem; font-size: 0.9rem;">
+              Enable IME
+            </button>
+            <button id="debugToggle3" onclick="toggleDebug()" style="width: auto; margin: 0; padding: 0.75rem 1.5rem; font-size: 0.9rem; background: var(--text-light); color: white;">
+              Debug: OFF
+            </button>
+            <span id="imeStatus3" style="font-weight: 600; color: var(--text-light);">
+              <kbd style="background: #e8e8f0; padding: 0.25rem 0.5rem; border-radius: 4px; font-family: monospace;">Shift+Space</kbd> to toggle
+            </span>
+          </div>
+          
+          <textarea id="imeInput3" placeholder="Type initial → medial → final explicitly" style="min-height: 120px; font-size: 1.2rem;"></textarea>
+          
+          <div class="info" style="margin-top: 1rem;">
+            <strong>Key difference:</strong> Each syllable component has dedicated keys · No automatic syllable splitting · 
+            Type 초성 → 중성 → 종성 in order · Punctuation keys produce Korean typographic symbols
+          </div>
+        </div>
+
+        <!-- Tools Tab Content -->
+        <div class="tab-content" id="tab-tools">
+          <h2 style="margin-bottom: 1.5rem; color: var(--text-dark);">Hangul Processing Tools</h2>
+          
+          <!-- Decompose Section -->
+          <div class="demo-section">
           <div class="section-header">
             <div class="section-icon">
               <svg viewBox="0 0 24 24">
@@ -656,7 +809,7 @@
             Processes entire strings, decomposing Hangul while preserving other characters.
           </div>
         </div>
-      </div>
+        </div> <!-- End tab-tools -->
 
       <!-- Footer -->
       <div class="footer">
@@ -953,27 +1106,63 @@
 
       // IME global variable
       let hangulIme = null;
+      let currentTab = '2bulsik';
+
+      // Tab switching function
+      function switchMainTab(tabName) {
+        currentTab = tabName;
+        
+        // Update tab buttons
+        document.querySelectorAll('.main-tab').forEach((tab, i) => {
+          const tabNames = ['2bulsik', '3bulsik', 'tools'];
+          if (tabNames[i] === tabName) {
+            tab.classList.add('active');
+          } else {
+            tab.classList.remove('active');
+          }
+        });
+        
+        // Update tab content
+        document.querySelectorAll('.tab-content').forEach(content => {
+          content.classList.remove('active');
+        });
+        document.getElementById('tab-' + tabName).classList.add('active');
+        
+        // Update IME layout mode when switching between IME tabs
+        if (hangulIme && (tabName === '2bulsik' || tabName === '3bulsik')) {
+          hangulIme.setLayoutMode(tabName);
+        }
+      }
 
       function toggleIme() {
         if (!hangulIme) return;
         
         const indicator = document.getElementById('imeIndicator');
-        const textarea = document.getElementById('imeInput');
+        const is2bulsik = currentTab === '2bulsik';
+        const textarea = document.getElementById(is2bulsik ? 'imeInput' : 'imeInput3');
+        const toggleBtn = document.getElementById(is2bulsik ? 'imeToggle2' : 'imeToggle3');
+        const statusEl = document.getElementById(is2bulsik ? 'imeStatus2' : 'imeStatus3');
         
         if (hangulIme.isEnabled()) {
           hangulIme.disable();
-          document.getElementById('imeToggle').textContent = 'Enable IME';
-          document.getElementById('imeStatus').innerHTML = 'Press <kbd style="background: #e8e8f0; padding: 0.25rem 0.5rem; border-radius: 4px; font-family: monospace;">Shift+Space</kbd> to toggle';
+          toggleBtn.textContent = 'Enable IME';
+          statusEl.innerHTML = '<kbd style="background: #e8e8f0; padding: 0.25rem 0.5rem; border-radius: 4px; font-family: monospace;">Shift+Space</kbd> to toggle';
           indicator.classList.remove('active');
           textarea.classList.remove('ime-active');
         } else {
+          // Set correct layout mode before enabling
+          hangulIme.setLayoutMode(currentTab === '3bulsik' ? '3bulsik' : '2bulsik');
           hangulIme.enable();
-          document.getElementById('imeToggle').textContent = 'Disable IME';
-          document.getElementById('imeStatus').innerHTML = '<span style="color: var(--success);">Active</span> (Press <kbd style="background: #e8e8f0; padding: 0.25rem 0.5rem; border-radius: 4px; font-family: monospace;">Shift+Space</kbd> to toggle)';
+          toggleBtn.textContent = 'Disable IME';
+          statusEl.innerHTML = '<span style="color: var(--success);">Active</span>';
           indicator.classList.add('active');
           textarea.classList.add('ime-active');
-          textarea.focus(); // Focus the input when enabling
+          textarea.focus();
         }
+        
+        // Update both toggle buttons to stay in sync
+        document.getElementById('imeToggle2').textContent = hangulIme.isEnabled() ? 'Disable IME' : 'Enable IME';
+        document.getElementById('imeToggle3').textContent = hangulIme.isEnabled() ? 'Disable IME' : 'Enable IME';
       }
 
       function toggleDebug() {
@@ -982,14 +1171,19 @@
         const currentState = hangulIme.isDebugEnabled();
         hangulIme.setDebug(!currentState);
         
-        const button = document.getElementById('debugToggle');
-        if (hangulIme.isDebugEnabled()) {
-          button.textContent = 'Debug: ON';
-          button.style.background = 'var(--success)';
-        } else {
-          button.textContent = 'Debug: OFF';
-          button.style.background = 'var(--text-light)';
-        }
+        // Update both debug buttons
+        const buttons = [document.getElementById('debugToggle2'), document.getElementById('debugToggle3')];
+        buttons.forEach(button => {
+          if (button) {
+            if (hangulIme.isDebugEnabled()) {
+              button.textContent = 'Debug: ON';
+              button.style.background = 'var(--success)';
+            } else {
+              button.textContent = 'Debug: OFF';
+              button.style.background = 'var(--text-light)';
+            }
+          }
+        });
       }
 
       // Initialize WASM module (optional - JavaScript fallback is fully functional)
@@ -1015,10 +1209,8 @@
               try {
                 // Dynamically import the IME module
                 const imeModule = await import('./hangul-ime.js');
-                hangulIme = imeModule.setupIme(wasmModuleObj, '#imeInput');
-                
-                // Show IME section
-                document.getElementById('imeSection').style.display = 'block';
+                // Setup IME for both textareas
+                hangulIme = imeModule.setupIme(wasmModuleObj, '#imeInput, #imeInput3');
                 
                 // Add Shift+Space toggle
                 document.addEventListener('keydown', (e) => {

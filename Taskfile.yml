@@ -57,21 +57,46 @@ tasks:
       - zig test hangul.zig -femit-bin=/dev/null
 
   fmt:
-    desc: Format code with zig fmt
+    desc: Format Zig and JavaScript code
     cmds:
       - zig fmt hangul.zig
+      - bunx biome check --write *.js tests/**/*.ts
 
   fmt:check:
     desc: Check if code is formatted (CI-friendly)
     cmds:
       - zig fmt --check hangul.zig
+      - bunx biome check *.js tests/**/*.ts
+
+  fmt:js:
+    desc: Format JavaScript/TypeScript code with Biome
+    cmds:
+      - bunx biome check --write *.js tests/**/*.ts
+
+  fmt:js:check:
+    desc: Check JavaScript/TypeScript formatting (CI-friendly)
+    cmds:
+      - bunx biome check *.js tests/**/*.ts
 
   lint:
-    desc: Check for Zig code issues
+    desc: Check for Zig and JavaScript code issues
     cmds:
       - |
-        echo "Running basic checks..."
+        echo "Running Zig build check..."
         zig build --release=small
+      - |
+        echo "Running Biome lint..."
+        bunx biome lint *.js tests/**/*.ts
+
+  lint:biome:
+    desc: Lint JavaScript/TypeScript code with Biome
+    cmds:
+      - bunx biome lint *.js tests/**/*.ts
+
+  lint:unsafe:
+    desc: Lint and auto-fix JavaScript/TypeScript with unsafe fixes
+    cmds:
+      - bunx biome check --write --unsafe *.js tests/**/*.ts
 
   run:demo:
     desc: Build WASM and serve the interactive demo on localhost:8120

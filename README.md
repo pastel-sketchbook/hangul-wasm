@@ -20,7 +20,7 @@ This library uses a **hybrid WASM + JavaScript architecture**:
 
 **Why WASM:**
 - **Performance**: O(1) algorithmic operations compiled to native code
-- **Size**: 4.3KB optimized binary (vs ~50KB JavaScript equivalent)
+- **Size**: 6.5KB optimized binary (vs ~50KB JavaScript equivalent)
 - **Type safety**: Zig's compile-time guarantees prevent runtime errors
 
 ### UI Integration Layer (JavaScript - `hangul-ime.js`)
@@ -159,7 +159,7 @@ zig build-obj hangul.zig -target wasm32-freestanding -O Debug
 
 ### Build Profiles
 
-- **ReleaseSmall** (4.9 KB): Optimized binary size, ideal for web distribution
+- **ReleaseSmall** (6.5 KB): Optimized binary size, ideal for web distribution
 - **ReleaseFast** (97 KB): Optimized runtime performance
 - **Debug**: Full debug information for development
 

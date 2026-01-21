@@ -20,3 +20,4 @@ ohi.js
 # Node/Bun
 node_modules/
 bun.lockb
+.task/checksum

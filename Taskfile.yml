@@ -28,6 +28,18 @@ tasks:
       - zig build
       - cp zig-out/bin/hangul.wasm hangul.wasm
 
+  build:server:
+    desc: Build the http.zig static file server
+    dir: server
+    cmds:
+      - zig build --release=fast
+    sources:
+      - src/**/*.zig
+      - build.zig
+      - build.zig.zon
+    generates:
+      - zig-out/bin/hangul-server
+
   test:
     desc: Run all tests
     cmds:
@@ -57,7 +69,7 @@ tasks:
 
   run:demo:
     desc: Build WASM and serve the interactive demo on localhost:8120
-    deps: [build:wasm]
+    deps: [build:wasm, build:server]
     cmds:
       - |
         PORT=8120
@@ -71,17 +83,12 @@ tasks:
           fi
         fi
         
-        if command -v uv &> /dev/null; then
-          echo "Starting web server on http://localhost:$PORT"
-          uv run python -m http.server $PORT
-        else
-          echo "Error: uv not found. Install with: curl -LsSf https://astral.sh/uv/install.sh | sh"
-          exit 1
-        fi
+        echo "Starting hangul-server on http://127.0.0.1:$PORT"
+        ./server/zig-out/bin/hangul-server --port $PORT
 
   run:demo:browse:
     desc: Build WASM, serve demo on localhost:8120, and open in browser
-    deps: [build:wasm]
+    deps: [build:wasm, build:server]
     cmds:
       - |
         PORT=8120
@@ -95,23 +102,18 @@ tasks:
           fi
         fi
         
-        if command -v uv &> /dev/null; then
-          echo "Starting web server on http://localhost:$PORT"
-          uv run python -m http.server $PORT &
-          SERVER_PID=$!
-          sleep 1
-          if command -v open &> /dev/null; then
-            open http://localhost:$PORT
-          elif command -v xdg-open &> /dev/null; then
-            xdg-open http://localhost:$PORT
-          else
-            echo "Open http://localhost:$PORT in your browser"
-          fi
-          wait $SERVER_PID
+        echo "Starting hangul-server on http://127.0.0.1:$PORT"
+        ./server/zig-out/bin/hangul-server --port $PORT &
+        SERVER_PID=$!
+        sleep 1
+        if command -v open &> /dev/null; then
+          open http://127.0.0.1:$PORT
+        elif command -v xdg-open &> /dev/null; then
+          xdg-open http://127.0.0.1:$PORT
         else
-          echo "Error: uv not found. Install with: curl -LsSf https://astral.sh/uv/install.sh | sh"
-          exit 1
+          echo "Open http://127.0.0.1:$PORT in your browser"
         fi
+        wait $SERVER_PID
 
   run:demo:kill:
     desc: Kill the demo server running on port 8120
@@ -135,6 +137,7 @@ tasks:
     cmds:
       - rm -f hangul.wasm
       - rm -rf zig-out .zig-cache
+      - rm -rf server/zig-out server/.zig-cache
 
   check:
     desc: Quick compile check without building WASM

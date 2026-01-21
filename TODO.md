@@ -2,7 +2,7 @@
 
 This document tracks planned enhancements, known issues, and future work for the hangul-wasm library.
 
-**Current Version**: v0.5.0  
+**Current Version**: v0.5.1  
 **Test Status**: 58 tests (57 passed, 1 skipped)  
 **WASM Size**: 4.9KB (ReleaseSmall)
 
@@ -78,6 +78,7 @@ This document tracks planned enhancements, known issues, and future work for the
 - [x] **Add release tasks to Taskfile** - Added `release:patch`, `release:minor`, `release:major` with VERSION file
 - [x] **GitHub Actions CI** - Added `.github/workflows/ci.yml` for automated testing and WASM build
 - [x] **Pre-built WASM releases** - Added `.github/workflows/release.yml` to publish WASM on version tags
+- [x] **Native Zig dev server** - Replaced Python/uv server with http.zig static file server (see `docs/rationale/0003_http_zig_static_server.md`)
 - [ ] **CDN distribution** - Publish to unpkg or jsdelivr for direct browser usage
 
 ---

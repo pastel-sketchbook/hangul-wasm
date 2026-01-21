@@ -129,7 +129,6 @@ This formula allows O(1) decomposition and composition operations.
 ### Requirements
 
 - **Zig**: 0.15 or later
-- **Optional**: [uv](https://astral.sh/uv) for running the interactive demo
 
 ### Quick Build
 
@@ -374,14 +373,11 @@ An HTML demo (`index.html`) is included with:
 
 Run the demo locally:
 ```bash
-task run:demo         # Serve demo on localhost:8120
-task run:demo:browse  # Open in browser automatically
+task run:demo         # Build WASM + server, serve demo on localhost:8120
+task run:demo:browse  # Same as above, also opens browser automatically
 ```
 
-**Demo Requirements**: [uv](https://astral.sh/uv) is required to serve the demo page (see Requirements above). Install with:
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
+The demo server is a lightweight Zig-based HTTP server (~352KB) built on [http.zig](https://github.com/karlseguin/http.zig). It serves only whitelisted files for security.
 
 The demo includes fallback JavaScript implementation for development. When `hangul.wasm` is available, all decomposition/composition operations automatically use the optimized Zig/WASM module via:
 - `wasm_isHangulSyllable()` for character validation
@@ -519,6 +515,7 @@ These can be added if needed; the core algorithmic foundation is in place.
 ### Rationale & Design
 
 - [**0001: Hangul Decomposition Algorithm**](./docs/rationale/0001_hangul_decomposition_algorithm.md) — Mathematical foundations of O(1) composition/decomposition, UTF-8 handling, boundary conditions, and algorithmic correctness guarantees.
+- [**0003: http.zig Static Server**](./docs/rationale/0003_http_zig_static_server.md) — Rationale for replacing Python server with native Zig/http.zig server.
 
 ### Development Guidelines
 
@@ -551,9 +548,10 @@ task fmt:check        # Check formatting (CI-friendly)
 task test             # Run test suite
 task test:verbose     # Verbose test output
 task build:wasm       # Build optimized WASM
+task build:server     # Build http.zig static file server
 task check:all        # Full quality check
 task pre:commit       # Pre-commit checks (fmt + test)
-task run:demo         # Build and serve interactive demo
+task run:demo         # Build WASM + server, serve interactive demo
 task run:demo:browse  # Build, serve, and open in browser
 task clean            # Remove build artifacts
 ```

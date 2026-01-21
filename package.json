@@ -1,0 +1,52 @@
+{
+  "name": "hangul-wasm",
+  "version": "0.3.0",
+  "description": "High-performance Korean Hangul text processing library using WebAssembly",
+  "type": "module",
+  "main": "hangul-ime.js",
+  "types": "hangul-ime.d.ts",
+  "files": [
+    "hangul.wasm",
+    "hangul-ime.js",
+    "hangul-ime.d.ts"
+  ],
+  "exports": {
+    ".": {
+      "types": "./hangul-ime.d.ts",
+      "import": "./hangul-ime.js"
+    },
+    "./wasm": "./hangul.wasm"
+  },
+  "scripts": {
+    "build": "task build:wasm",
+    "test": "task test",
+    "check": "task check:all",
+    "prepublishOnly": "task build:wasm"
+  },
+  "keywords": [
+    "hangul",
+    "korean",
+    "ime",
+    "input-method",
+    "wasm",
+    "webassembly",
+    "zig",
+    "text-processing",
+    "decomposition",
+    "composition",
+    "jamo"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pastel-sketchbook/hangul-wasm.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pastel-sketchbook/hangul-wasm/issues"
+  },
+  "homepage": "https://github.com/pastel-sketchbook/hangul-wasm#readme",
+  "devDependencies": {
+    "typescript": "~5.9.0"
+  }
+}

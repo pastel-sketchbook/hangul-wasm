@@ -29,8 +29,8 @@ This document tracks planned enhancements, known issues, and future work for the
 ### Documentation & Usability
 
 - [x] **Update README.md test count** - ~~Currently shows "3 core tests" but there are 29 tests total~~ Updated to show 32 tests
-- [ ] **Add npm package setup** - Create `package.json` for easy npm/yarn installation
-- [ ] **TypeScript type definitions** - Add `.d.ts` file for TypeScript users
+- [x] **Add npm package setup** - Created `package.json` with Bun support for npm/yarn/bun installation
+- [x] **TypeScript type definitions** - Added `hangul-ime.d.ts` with full API types
 - [ ] **API reference documentation** - Generate docs from code comments
 
 ### Testing & Quality

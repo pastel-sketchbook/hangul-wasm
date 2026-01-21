@@ -16,3 +16,7 @@ zig-out/
 # Test scripts
 test_wasm.js
 ohi.js
+
+# Node/Bun
+node_modules/
+bun.lockb

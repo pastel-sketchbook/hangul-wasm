@@ -1236,29 +1236,26 @@ test "3-bulsik: no syllable splitting (unlike 2-bulsik)" {
     try std.testing.expectEqual(@as(u32, 0x314F), result.current_codepoint); // ㅏ (single jamo, not 나)
 }
 
-test "3-bulsik: jong-jung-cho order (typing final first)" {
-    // In 3-Bulsik, user may type final (jong) first, then vowel (jung), then initial (cho)
-    // This tests the jong→jung→cho input order support
-    // Using ohi indices directly: jong 4 (ㄴ), jung 31 (ㅏ), cho 30 (ㅎ)
-    // Expected result: 한 (U+D55C) = ㅎ initial + ㅏ medial + ㄴ final
+test "3-bulsik: jong without cho emits jong alone" {
+    // In 3-Bulsik, typing jong without cho first outputs just the jong jamo
+    // When jung is typed next, the jong is emitted and new composition starts with jung
+    // This matches ohi.js behavior
     var state = ImeState.init();
 
-    // Step 1: Type jong ㄴ (ohi index 4) - final first, before vowel
+    // Step 1: Type jong ㄴ (ohi index 4) without cho
     const r1 = processJong3Bulsik(&state, 4);
     try std.testing.expectEqual(.replace, r1.action);
-    try std.testing.expectEqual(@as(u32, 0x3134), r1.current_codepoint); // ㄴ (jamo)
+    try std.testing.expectEqual(@as(u32, 0x3134), r1.current_codepoint); // ㄴ jamo
     try std.testing.expectEqual(@as(i8, 4), state.final);
+    try std.testing.expectEqual(@as(i8, 0), state.initial);
 
-    // Step 2: Type jung ㅏ (ohi index 31) - vowel, state now has jong + jung, waiting for cho
+    // Step 2: Type jung ㅏ (ohi index 31) - should emit jong, start new with jung
     const r2 = processJung3Bulsik(&state, 31);
-    try std.testing.expectEqual(.replace, r2.action);
+    try std.testing.expectEqual(.emit_and_new, r2.action);
+    try std.testing.expectEqual(@as(u32, 0x3134), r2.prev_codepoint); // Emitted ㄴ
+    try std.testing.expectEqual(@as(u32, 0x314F), r2.current_codepoint); // New ㅏ
     try std.testing.expectEqual(@as(i8, 31), state.medial);
-    try std.testing.expectEqual(@as(i8, 4), state.final); // final preserved
-
-    // Step 3: Type cho ㅎ (ohi index 30) - initial completes the syllable
-    const r3 = processCho3Bulsik(&state, 30);
-    try std.testing.expectEqual(.replace, r3.action);
-    try std.testing.expectEqual(@as(u32, 0xD55C), r3.current_codepoint); // 한
+    try std.testing.expectEqual(@as(i8, 0), state.final); // Final was reset
 }
 
 test "ime commit finalizes composition" {
@@ -1867,7 +1864,7 @@ fn processVowel2Bulsik(state: *ImeState, jamo_index: i8) KeyResult {
 // ============================================================================
 
 /// Process initial consonant (cho) in 3-Bulsik mode
-/// In 3-Bulsik, user may type in order: jong → jung → cho (final first)
+/// Based on ohi.js Hangul3() lines 300-309
 fn processCho3Bulsik(state: *ImeState, cho_index: u8) KeyResult {
     var result: KeyResult = .{
         .action = .replace,
@@ -1876,6 +1873,7 @@ fn processCho3Bulsik(state: *ImeState, cho_index: u8) KeyResult {
     };
 
     // If have existing initial without medial, try double initial
+    // ohi.js: this.doubleJamo(0, this._q[0], c - 92)
     if (state.initial > 0 and state.medial == 0 and state.initial_flag == 0) {
         const double_idx = detectDoubleJamo(.initial, @intCast(state.initial), cho_index);
         if (double_idx != 0) {
@@ -1887,18 +1885,10 @@ fn processCho3Bulsik(state: *ImeState, cho_index: u8) KeyResult {
         }
     }
 
-    // 3-Bulsik special case: have jung+jong but no initial (typed in jong→jung→cho order)
-    // Example: user typed '1' (jong ㅎ), 'f' (jung ㅏ), now typing 'h' (cho ㄴ)
-    // Add the initial to complete the syllable: ㄴ + ㅏ + ㅎ = 낳
-    if (state.initial == 0 and state.medial > 0) {
-        state.initial = @intCast(cho_index);
-        state.initial_flag = 0;
-        result.action = .replace;
-        result.current_codepoint = state.toCodepoint();
-        return result;
-    }
-
-    // If have any existing composition, emit it first
+    // ohi.js condition: _q[1] || _q[2] || !doubleJamo(...)
+    // If have medial (_q[2]) or have initial-double flag (_q[1]), emit current and start new
+    // Otherwise if doubleJamo succeeded, we already returned above
+    // So if we get here: emit current (if any), start new with cho
     if (!state.isEmpty()) {
         result.action = .emit_and_new;
         result.prev_codepoint = state.toCodepoint();
@@ -1914,7 +1904,7 @@ fn processCho3Bulsik(state: *ImeState, cho_index: u8) KeyResult {
 }
 
 /// Process medial vowel (jung) in 3-Bulsik mode
-/// In 3-Bulsik, user may type in order: jong → jung → cho (final first)
+/// Based on ohi.js Hangul3() lines 310-319
 fn processJung3Bulsik(state: *ImeState, jung_index: u8) KeyResult {
     var result: KeyResult = .{
         .action = .replace,
@@ -1936,33 +1926,30 @@ fn processJung3Bulsik(state: *ImeState, jung_index: u8) KeyResult {
         state.medial = -1;
     }
 
-    // 3-Bulsik special case: have only jong (final), waiting for jung and cho
-    // Example: user typed '1' (jong ㅎ), now typing 'f' (jung ㅏ)
-    // Keep the final, add the medial, wait for initial
-    if (state.initial == 0 and state.medial == 0 and state.final > 0) {
-        state.medial = @intCast(jung_index);
-        state.medial_flag = 0;
-        result.action = .replace;
-        result.current_codepoint = state.toCodepoint();
-        return result;
-    }
+    // ohi.js condition: ((!_q[0] || _q[2]) && (!_q[3] || _q[4])) || _q[2] < 0
+    // Translation:
+    // - (!_q[0] || _q[2]) = no cho OR already have jung
+    // - (!_q[3] || _q[4]) = no jung-double OR have jong
+    // If this condition is true, emit current and start new with just jung
+    const should_emit = ((state.initial == 0 or state.medial != 0) and
+        (state.medial_flag == 0 or state.final > 0)) or
+        state.medial < 0;
 
-    // If syllable already has medial or is in invalid state, emit and start new
-    if ((state.initial == 0 and state.medial == 0) or // Empty state, just add jung
-        (state.initial > 0 and state.medial == 0))
-    { // Have cho, add jung
-        state.medial = @intCast(jung_index);
-        state.medial_flag = 0;
-        result.action = .replace;
-        result.current_codepoint = state.toCodepoint();
-    } else {
-        // Have complete syllable or invalid state, emit and start new
+    if (should_emit) {
+        // Emit current composition (if any) and start new with just jung
         if (!state.isEmpty()) {
             result.action = .emit_and_new;
             result.prev_codepoint = state.toCodepoint();
         }
         state.reset();
         state.medial = @intCast(jung_index);
+        state.medial_flag = 0;
+        result.current_codepoint = state.toCodepoint();
+    } else {
+        // Add jung to existing cho
+        state.medial = @intCast(jung_index);
+        state.medial_flag = 0;
+        result.action = .replace;
         result.current_codepoint = state.toCodepoint();
     }
 

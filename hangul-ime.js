@@ -42,7 +42,6 @@ export class HangulIme {
         this.enabled = false;
         this.hasComposition = false; // Track if there's an active composition
         this.compositionStart = -1; // Track where composition started in the text field
-        this.keySequence = []; // Track keys pressed for current syllable
         this.debug = options.debug !== undefined ? options.debug : DEBUG;
         this.layoutMode = options.layout || LAYOUT_MODE_2BULSIK; // Default to 2-Bulsik
         
@@ -91,13 +90,11 @@ export class HangulIme {
     enable() {
         this.enabled = true;
         this.reset();
-        // this.updateOverlay(); // DISABLED
     }
     
     disable() {
         this.enabled = false;
         this.reset();
-        // this.hideOverlay(); // DISABLED
     }
     
     isEnabled() {
@@ -119,8 +116,6 @@ export class HangulIme {
         this.wasm.wasm_ime_reset(this.handle);
         this.hasComposition = false;
         this.compositionStart = -1;
-        this.keySequence = [];
-        // this.updateOverlay(); // DISABLED
     }
     
     /**
@@ -137,7 +132,6 @@ export class HangulIme {
             // Nothing to commit - just reset local state
             this.hasComposition = false;
             this.compositionStart = -1;
-            this.keySequence = [];
             return null;
         }
         
@@ -150,53 +144,8 @@ export class HangulIme {
         // Reset local state (WASM state already reset by wasm_ime_commit)
         this.hasComposition = false;
         this.compositionStart = -1;
-        this.keySequence = [];
         
         return char;
-    }
-    
-    updateOverlay() {
-        const overlay = document.getElementById('compositionOverlay');
-        const keysDisplay = document.getElementById('keysPressed');
-        const compositionDisplay = document.getElementById('currentComposition');
-        
-        if (!overlay) return;
-        
-        if (this.enabled && this.keySequence.length > 0) {
-            overlay.style.display = 'block';
-            keysDisplay.textContent = this.keySequence.join(' + ');
-            
-            // Get current composition from WASM
-            const state = this.getState();
-            const composition = this.stateToString(state);
-            compositionDisplay.textContent = composition || '—';
-        } else if (this.enabled) {
-            overlay.style.display = 'block';
-            keysDisplay.textContent = '—';
-            compositionDisplay.textContent = '—';
-        } else {
-            overlay.style.display = 'none';
-        }
-    }
-    
-    hideOverlay() {
-        const overlay = document.getElementById('compositionOverlay');
-        if (overlay) overlay.style.display = 'none';
-    }
-    
-    stateToString(state) {
-        // Convert state to displayable characters
-        let result = '';
-        if (state.initial !== 0) {
-            result += String.fromCodePoint(0x3130 + state.initial);
-        }
-        if (state.medial !== 0) {
-            result += String.fromCodePoint(0x3130 + state.medial);
-        }
-        if (state.final !== 0) {
-            result += String.fromCodePoint(0x3130 + state.final);
-        }
-        return result;
     }
     
     /**
@@ -310,15 +259,6 @@ export class HangulIme {
             console.log(`[HangulIme]   → WASM result: action=${action}, prev=U+${prevCodepoint.toString(16).toUpperCase().padStart(4, '0')}, current=U+${currentCodepoint.toString(16).toUpperCase().padStart(4, '0')} (${currentCodepoint !== 0 ? String.fromCodePoint(currentCodepoint) : ''})`);
         }
         
-        // Track key sequence
-        if (action === ACTION_EMIT_AND_NEW) {
-            // Starting new syllable, reset sequence
-            this.keySequence = [char];
-        } else {
-            // Continuing current syllable
-            this.keySequence.push(char);
-        }
-        
         switch (action) {
             case ACTION_REPLACE:
                 // Replace the last character with the new composition
@@ -364,9 +304,6 @@ export class HangulIme {
                 break;
         }
         
-        // Update overlay with current composition
-        // this.updateOverlay(); // DISABLED
-        
         return true; // Event was handled
     }
     
@@ -404,12 +341,6 @@ export class HangulIme {
                 console.log(`[HangulIme]   → After replace: cursor=${field.selectionStart}, value="${field.value}"`);
             }
             
-            // Remove last key from sequence
-            if (this.keySequence.length > 0) {
-                this.keySequence.pop();
-            }
-            // this.updateOverlay(); // DISABLED
-            
             return true;
         }
         
@@ -429,8 +360,6 @@ export class HangulIme {
         
         this.hasComposition = false;
         this.compositionStart = -1;
-        this.keySequence = [];
-        // this.updateOverlay(); // DISABLED
         return true; // We handled it by deleting the composition
     }
     

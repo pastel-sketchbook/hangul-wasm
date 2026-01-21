@@ -1616,23 +1616,6 @@ pub const KeyResult = struct {
     prev_codepoint: u32, // Emit this first (if action=emit_and_new)
     current_codepoint: u32, // Then emit/replace with this
 };
-
-/// 2-Bulsik (Dubeolsik) keyboard layout mapping
-/// Maps ASCII characters to jamo indices (1-based for compatibility with ohi.js logic)
-/// Index < 31 = consonant (can be initial or final)
-/// Index >= 31 = vowel (medial only)
-const LAYOUT_2BULSIK = [_]u8{
-    // Mapping from ohi.js lines 119-146
-    // r    R    t    T    s    e    E    f    a    q    Q    t    d    w    W    c    z
-    17, 1,  21, 2, 4, 7, 8, 9, 17, 18, 19, 21, 23, 24, 25, 26,
-    // x    v    g
-    27, 28, 29,
-    30,
-    // Shifted keys (uppercase)
-    // Vowels: k=ㅏ, o=ㅐ, i=ㅑ, O=ㅒ, j=ㅓ, p=ㅔ, u=ㅕ, P=ㅖ, h=ㅗ, hk=ㅘ, ho=ㅙ, hl=ㅚ
-    // y=ㅛ, n=ㅜ, nj=ㅝ, np=ㅞ, nl=ㅟ, b=ㅠ, m=ㅡ, ml=ㅢ, l=ㅣ
-};
-
 // ============================================================================
 // 3-Bulsik (Sebeolsik) Keyboard Layout
 // ============================================================================

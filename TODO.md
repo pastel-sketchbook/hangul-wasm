@@ -2,7 +2,7 @@
 
 This document tracks planned enhancements, known issues, and future work for the hangul-wasm library.
 
-**Current Version**: v0.4.0  
+**Current Version**: v0.5.0  
 **Test Status**: 58 tests (57 passed, 1 skipped)  
 **WASM Size**: 4.9KB (ReleaseSmall)
 

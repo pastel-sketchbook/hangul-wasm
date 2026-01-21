@@ -178,28 +178,34 @@ zig test hangul.zig
 
 ### Test Suite
 
-The implementation includes 3 core tests covering:
+The implementation includes 32 tests covering:
 
-- **`decompose hangul`**: Validates correct decomposition of boundary and mid-range syllables
-  - Tests 가 (U+AC00, first syllable) with no final consonant
-  - Tests 한 (U+D55C, mid-range) with final consonant
-  - Verifies compatibility jamo output
+**Core decomposition/composition:**
+- Validates correct decomposition of boundary and mid-range syllables
+- Tests 가 (U+AC00, first syllable) with no final consonant
+- Tests 한 (U+D55C, mid-range) with final consonant
+- Verifies compatibility jamo output
+- Exhaustive roundtrip testing of all 11,172 Hangul syllables
 
-- **`compose hangul`**: Validates assembly of jamo components into syllables
-  - Tests composition without final (ㄱ + ㅏ → 가)
-  - Tests composition with final (ㅎ + ㅏ + ㄴ → 한)
+**IME (Input Method Editor):**
+- 2-Bulsik keyboard layout mapping
+- Double jamo detection (initial, medial, final consonants)
+- Syllable splitting and composition
+- Double final consonant splitting (e.g., ㄺ → ㄹ + ㄱ)
+- Backspace decomposition
 
-- **`has final`**: Ensures correct final consonant detection
-  - Tests syllables with and without final consonants
+**UTF-8 and validation:**
+- UTF-8 decoding for Korean text
+- Invalid jamo combination rejection
+- Buffer validation for WASM exports
 
 ### All Tests Passing
 
 ```
-1/3 hangul.test.decompose hangul...OK
-2/3 hangul.test.compose hangul...OK
-3/3 hangul.test.has final...OK
-All 3 tests passed.
+31 passed; 1 skipped; 0 failed.
 ```
+
+The skipped test (`wasm_decompose_safe buffer validation`) only runs on WASM targets.
 
 ## Usage
 

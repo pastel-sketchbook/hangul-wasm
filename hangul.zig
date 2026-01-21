@@ -499,7 +499,7 @@ test "exhaustive validation: invalid jamo combinations rejected" {
     try std.testing.expect(compose(valid_medial, valid_final, invalid_initial) == null);
 }
 
-test "wasm_decompose_safe buffer validation" {
+test "wasm_decompose_safe buffer validation (wasm only)" {
     // Skip this test on non-WASM targets since pointer casting behaves differently
     if (@import("builtin").target.cpu.arch != .wasm32) return error.SkipZigTest;
 
@@ -523,6 +523,41 @@ test "wasm_decompose_safe buffer validation" {
     // Test with invalid syllable
     const invalid = wasm_decompose_safe(0x1234, output_ptr, 3);
     try std.testing.expect(!invalid);
+}
+
+test "decompose_safe logic validation (host)" {
+    // Test the underlying decompose function that wasm_decompose_safe wraps
+    // This validates the same logic without WASM-specific pointer handling
+
+    // Test valid syllable 한 (U+D55C)
+    const han = decompose(0xD55C);
+    try std.testing.expect(han != null);
+    if (han) |j| {
+        try std.testing.expectEqual(COMPAT_INITIAL[18], j.initial); // ㅎ
+        try std.testing.expectEqual(COMPAT_MEDIAL[0], j.medial); // ㅏ
+        try std.testing.expectEqual(COMPAT_FINAL[4], j.final); // ㄴ
+    }
+
+    // Test valid syllable 가 (U+AC00) - no final
+    const ga = decompose(0xAC00);
+    try std.testing.expect(ga != null);
+    if (ga) |j| {
+        try std.testing.expectEqual(COMPAT_INITIAL[0], j.initial); // ㄱ
+        try std.testing.expectEqual(COMPAT_MEDIAL[0], j.medial); // ㅏ
+        try std.testing.expectEqual(@as(u32, 0), j.final); // no final
+    }
+
+    // Test invalid character (not a Hangul syllable)
+    const invalid = decompose(0x1234);
+    try std.testing.expect(invalid == null);
+
+    // Test character below Hangul range
+    const below = decompose(0xABFF);
+    try std.testing.expect(below == null);
+
+    // Test character above Hangul range
+    const above = decompose(0xD7A4);
+    try std.testing.expect(above == null);
 }
 
 // ============================================================================
@@ -615,6 +650,10 @@ test "double jamo: final consonants" {
     try std.testing.expectEqual(@as(u8, 6), detectDoubleJamo(.final, 4, 27));
     // ㅂ+ㅅ=ㅄ
     try std.testing.expectEqual(@as(u8, 20), detectDoubleJamo(.final, 18, 19));
+    // ㄹ+ㄱ=ㄺ (ohi index: ㄹ=9, ㄱ=1) → result ohi 10 → final[9]
+    try std.testing.expectEqual(@as(u8, 10), detectDoubleJamo(.final, 9, 1));
+    // ㄹ+ㅁ=ㄻ (ohi index: ㄹ=9, ㅁ=17) → result ohi 11 → final[10]
+    try std.testing.expectEqual(@as(u8, 11), detectDoubleJamo(.final, 9, 17));
 
     // Cannot double
     try std.testing.expectEqual(@as(u8, 0), detectDoubleJamo(.final, 1, 4)); // ㄱ+ㄴ
@@ -730,6 +769,28 @@ test "backspace decomposition" {
     const cp3 = processBackspace(&state);
     try std.testing.expect(cp3 == null);
     try std.testing.expect(state.isEmpty());
+}
+
+test "double final consonant splitting" {
+    // When typing 닭 (ㄷ+ㅏ+ㄹ+ㄱ) then a vowel, the ㄹㄱ should split:
+    // 닭 + ㅏ → 달가 (not 닭ㄱㅏ)
+    // The ㄹ stays as final of first syllable, ㄱ becomes initial of new syllable
+    var state = ImeState.init();
+
+    // Type 닭: e(ㄷ=7) + k(ㅏ=31) + f(ㄹ=9) + r(ㄱ=1) - forms double final ㄺ
+    _ = processConsonant2Bulsik(&state, 7); // ㄷ
+    _ = processVowel2Bulsik(&state, 31); // ㅏ
+    _ = processConsonant2Bulsik(&state, 9); // ㄹ
+    const r1 = processConsonant2Bulsik(&state, 1); // ㄱ - should form double final ㄺ
+    try std.testing.expectEqual(.replace, r1.action);
+    try std.testing.expectEqual(@as(u32, 0xB2ED), r1.current_codepoint); // 닭 (U+B2ED)
+
+    // Now type a vowel - should split the double final
+    // 닭 → 달 + 가
+    const r2 = processVowel2Bulsik(&state, 31); // ㅏ
+    try std.testing.expectEqual(.emit_and_new, r2.action);
+    try std.testing.expectEqual(@as(u32, 0xB2EC), r2.prev_codepoint); // 달 (U+B2EC) - final ㄹ only
+    try std.testing.expectEqual(@as(u32, 0xAC00), r2.current_codepoint); // 가 (U+AC00) - ㄱ+ㅏ
 }
 
 test "typing 입력할 then backspace should decompose 할" {
@@ -937,11 +998,24 @@ const DoubleFinalMap = struct {
 };
 
 const DOUBLE_FINAL_MAPS = [_]DoubleFinalMap{
-    .{ .base = 1, .targets = &[_]u8{19}, .results = &[_]u8{3} }, // ㄱ+ㅅ=ㄳ
+    .{ .base = 1, .targets = &[_]u8{19}, .results = &[_]u8{3} }, // ㄱ+ㅅ=ㄳ (final[3])
     .{ .base = 4, .targets = &[_]u8{ 22, 27 }, .results = &[_]u8{ 5, 6 } }, // ㄴ+ㅈ=ㄵ, ㄴ+ㅎ=ㄶ
-    .{ .base = 8, .targets = &[_]u8{ 1, 17, 18, 19, 25, 26, 27 }, .results = &[_]u8{ 9, 10, 11, 12, 13, 14, 15 } }, // ㄹ+...
-    .{ .base = 18, .targets = &[_]u8{19}, .results = &[_]u8{20} }, // ㅂ+ㅅ=ㅄ
+    .{ .base = 9, .targets = &[_]u8{ 1, 17, 18, 19, 25, 26, 27 }, .results = &[_]u8{ 10, 11, 12, 13, 14, 15, 16 } }, // ㄹ+ㄱ=ㄺ(10), ㄹ+ㅁ=ㄻ(11), ㄹ+ㅂ=ㄼ(12), ㄹ+ㅅ=ㄽ(13), ㄹ+ㅌ=ㄾ(14), ㄹ+ㅍ=ㄿ(15), ㄹ+ㅎ=ㅀ(16)
+    .{ .base = 18, .targets = &[_]u8{19}, .results = &[_]u8{20} }, // ㅂ+ㅅ=ㅄ (final[18])
 };
+
+/// Split a double final consonant back into its two components
+/// Returns (base, target) ohi indices, or (0, 0) if not a double final
+fn splitDoubleFinal(double_final: u8) struct { base: u8, second: u8 } {
+    for (DOUBLE_FINAL_MAPS) |map| {
+        for (map.targets, 0..) |target, i| {
+            if (double_final == map.results[i]) {
+                return .{ .base = map.base, .second = target };
+            }
+        }
+    }
+    return .{ .base = 0, .second = 0 };
+}
 
 /// Detect if current + incoming jamo can form double jamo
 /// Returns new compound index or 0 if cannot combine
@@ -1089,15 +1163,33 @@ fn processVowel2Bulsik(state: *ImeState, jamo_index: i8) KeyResult {
 
     // Scenario 2: Syllable splitting
     if (state.initial > 0 and state.medial > 0 and state.final > 0) {
-        // Emit current syllable without final
-        const temp_final = state.final;
-        state.final = 0;
+        const temp_final: u8 = @intCast(state.final);
+        var new_initial: i8 = undefined;
+
+        // Check if this is a double final that needs splitting
+        if (state.final_flag == 1) {
+            // Double final: split it - first component stays, second becomes new initial
+            const split = splitDoubleFinal(temp_final);
+            if (split.base != 0) {
+                state.final = @intCast(split.base);
+                new_initial = @intCast(split.second);
+            } else {
+                state.final = 0;
+                new_initial = @intCast(temp_final);
+            }
+        } else {
+            // Single final: move it entirely to new syllable
+            state.final = 0;
+            new_initial = @intCast(temp_final);
+        }
+        state.final_flag = 0;
+
         result.action = .emit_and_new;
         result.prev_codepoint = state.toCodepoint();
 
-        // Start new syllable with old final as initial
+        // Start new syllable with the appropriate initial
         state.reset();
-        state.initial = temp_final;
+        state.initial = new_initial;
         state.medial = jamo_index;
         state.initial_flag = 0;
         state.medial_flag = 0;

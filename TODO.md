@@ -3,7 +3,7 @@
 This document tracks planned enhancements, known issues, and future work for the hangul-wasm library.
 
 **Current Version**: v0.3.0  
-**Test Status**: 29 tests (28 passed, 1 skipped)  
+**Test Status**: 32 tests (31 passed, 1 skipped)  
 **WASM Size**: 4.4KB (ReleaseSmall)
 
 ---
@@ -28,20 +28,20 @@ This document tracks planned enhancements, known issues, and future work for the
 
 ### Documentation & Usability
 
-- [ ] **Update README.md test count** - Currently shows "3 core tests" but there are 29 tests total (README.md:179-202)
+- [x] **Update README.md test count** - ~~Currently shows "3 core tests" but there are 29 tests total~~ Updated to show 32 tests
 - [ ] **Add npm package setup** - Create `package.json` for easy npm/yarn installation
 - [ ] **TypeScript type definitions** - Add `.d.ts` file for TypeScript users
 - [ ] **API reference documentation** - Generate docs from code comments
 
 ### Testing & Quality
 
-- [ ] **Fix skipped test** - `wasm_decompose_safe buffer validation` is skipped on non-WASM targets; consider adding equivalent host test (hangul.zig:502-526)
+- [x] **Fix skipped test** - Added `decompose_safe logic validation (host)` test that validates the same logic without WASM-specific pointer handling
 - [ ] **Add integration tests** - Browser-based tests using Playwright or similar
 - [ ] **Add performance benchmarks** - Measure and document actual performance vs JavaScript implementations
 
 ### IME Improvements
 
-- [ ] **Fix double final consonant splitting** - When a double final (e.g., ㄳ, ㄵ) needs to split, only the second component should move to new syllable
+- [x] **Fix double final consonant splitting** - Fixed: when a double final (e.g., ㄺ) splits on vowel input, first component stays as final, second becomes new initial (닭+ㅏ→달가)
 - [ ] **Add `wasm_ime_commit()`** - Explicit function to finalize current composition without space key
 - [ ] **Improve composition overlay** - Currently disabled in `hangul-ime.js` (lines 65, 71, 93, etc.)
 

@@ -37,6 +37,31 @@ jobs:
           name: hangul-wasm
           path: zig-out/bin/hangul.wasm
 
+  benchmark:
+    name: Performance Benchmark
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v1
+        with:
+          version: 0.14.0
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      
+      - name: Build WASM
+        run: |
+          zig build --release=small
+          cp zig-out/bin/hangul.wasm hangul.wasm
+      
+      - name: Run benchmarks
+        run: bun bench/benchmark.js
+
   typecheck:
     name: TypeScript Check
     runs-on: ubuntu-latest

@@ -42,10 +42,42 @@ This library uses a **hybrid WASM + JavaScript architecture**:
 
 ### Division of Responsibility
 
+```mermaid
+flowchart TB
+    subgraph Browser["Browser Environment"]
+        User["User types 'gks'"]
+        DOM["DOM Input Field"]
+    end
+
+    subgraph JS["JavaScript Layer (hangul-ime.js)"]
+        KeyHandler["Keyboard Event Handler"]
+        LayoutMap["2-Bulsik Layout Mapping<br/>g→ㅎ(30), k→ㅏ(31), s→ㄴ(4)"]
+        DOMUpdate["DOM Updater"]
+    end
+
+    subgraph WASM["WASM Layer (hangul.wasm)"]
+        IME["IME State Machine"]
+        State["ImeState<br/>{initial: 30, medial: 31, final: 4}"]
+        Compose["compose() → 0xD55C (한)"]
+    end
+
+    User -->|keypress| KeyHandler
+    KeyHandler -->|ASCII code| LayoutMap
+    LayoutMap -->|jamo index| IME
+    IME -->|update| State
+    State -->|compute| Compose
+    Compose -->|codepoint + action| DOMUpdate
+    DOMUpdate -->|insertText| DOM
+
+    style WASM fill:#e8f4e8,stroke:#4a7c4a
+    style JS fill:#e8e8f4,stroke:#4a4a7c
+    style Browser fill:#f4e8e8,stroke:#7c4a4a
+```
+
 ```
 User types "g" on keyboard
          ↓
-[JavaScript] Captures keypress event → Maps 'g' to jamo index 0 (ㅎ)
+[JavaScript] Captures keypress event → Maps 'g' to jamo index 30 (ㅎ)
          ↓
 [WASM] Processes jamo index → Returns composed syllable or action code
          ↓
@@ -519,7 +551,7 @@ The WASM module uses a simple 16KB static buffer allocator for memory management
 |-----------|-----------|-------|
 | `isHangulSyllable` | O(1) | Simple range check |
 | `decompose` | O(1) | Arithmetic decomposition |
-| `compose` | O(19 + 21 + 28) | Linear jamo lookup (worst case) |
+| `compose` | O(1) | Comptime-generated reverse lookup tables |
 | `decomposeString` | O(n) | Linear scan with UTF-8 decoding |
 
 ### Benchmark Results
@@ -527,11 +559,12 @@ The WASM module uses a simple 16KB static buffer allocator for memory management
 Run `task benchmark` to compare WASM vs pure JavaScript performance:
 
 ```
-Single Operations (IME use case):
-  WASM decompose:  ~1.5-2x faster than JavaScript
-  WASM compose:    ~1.5-2x faster than JavaScript
+Single Operations (per-keystroke IME use case):
+  isHangulSyllable:  WASM 1.1x faster  (50M ops/sec vs 45M ops/sec)
+  decompose:         WASM 1.7x faster  (35M ops/sec vs 21M ops/sec)
+  compose:           WASM 1.8x faster  (30M ops/sec vs 17M ops/sec)
 
-Bulk Operations (1000+ iterations):
+Bulk Operations (11,172 syllables):
   JavaScript can be faster due to WASM function call overhead
 ```
 

@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.15.0
+      
+      - name: Check formatting
+        run: zig fmt --check hangul.zig
+      
+      - name: Run tests
+        run: zig build test
+      
+      - name: Build WASM (ReleaseSmall)
+        run: zig build --release=small
+      
+      - name: Show WASM size
+        run: ls -lh zig-out/bin/hangul.wasm
+      
+      - name: Upload WASM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hangul-wasm
+          path: zig-out/bin/hangul.wasm
+
+  typecheck:
+    name: TypeScript Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      
+      - name: Install dependencies
+        run: bun install
+      
+      - name: TypeScript check
+        run: bunx tsc --noEmit hangul-ime.d.ts

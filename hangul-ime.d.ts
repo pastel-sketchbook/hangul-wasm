@@ -55,6 +55,18 @@ export interface HangulWasmExports {
   wasm_hasFinal(syllable: number): boolean;
   wasm_isHangulSyllable(char: number): boolean;
   
+  // Jamo classification
+  /** Check if codepoint is a compatibility jamo (consonant or vowel) */
+  wasm_isJamo(char: number): boolean;
+  /** Check if codepoint is a consonant (초성/종성) */
+  wasm_isConsonant(char: number): boolean;
+  /** Check if codepoint is a vowel (중성) */
+  wasm_isVowel(char: number): boolean;
+  /** Check if codepoint is a double consonant (ㄲ, ㄸ, ㅃ, ㅆ, ㅉ) */
+  wasm_isDoubleConsonant(char: number): boolean;
+  /** Check if codepoint is a double vowel (ㅘ, ㅙ, ㅚ, ㅝ, ㅞ, ㅟ, ㅢ) */
+  wasm_isDoubleVowel(char: number): boolean;
+  
   // String processing
   wasm_decomposeString(input_ptr: number, input_len: number, output_ptr: number): number;
   

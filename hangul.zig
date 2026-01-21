@@ -84,6 +84,49 @@ pub fn isHangulSyllable(c: u32) bool {
     return c >= HANGUL_SYLLABLE_BASE and c <= HANGUL_SYLLABLE_END;
 }
 
+// Jamo classification constants
+// Compatibility Jamo range: U+3131 to U+3163
+const COMPAT_JAMO_START: u32 = 0x3131;
+const COMPAT_JAMO_END: u32 = 0x3163;
+const COMPAT_VOWEL_START: u32 = 0x314F; // ㅏ
+
+// Double consonants (initial): ㄲ, ㄸ, ㅃ, ㅆ, ㅉ
+const DOUBLE_CONSONANTS = [_]u32{ 0x3132, 0x3138, 0x3143, 0x3146, 0x3149 };
+
+// Double vowels: ㅘ, ㅙ, ㅚ, ㅝ, ㅞ, ㅟ, ㅢ
+const DOUBLE_VOWELS = [_]u32{ 0x3158, 0x3159, 0x315A, 0x315D, 0x315E, 0x315F, 0x3162 };
+
+/// Check if codepoint is a compatibility jamo (consonant or vowel)
+pub fn isJamo(c: u32) bool {
+    return c >= COMPAT_JAMO_START and c <= COMPAT_JAMO_END;
+}
+
+/// Check if codepoint is a consonant (초성/종성)
+pub fn isConsonant(c: u32) bool {
+    return c >= COMPAT_JAMO_START and c < COMPAT_VOWEL_START;
+}
+
+/// Check if codepoint is a vowel (중성)
+pub fn isVowel(c: u32) bool {
+    return c >= COMPAT_VOWEL_START and c <= COMPAT_JAMO_END;
+}
+
+/// Check if codepoint is a double consonant (ㄲ, ㄸ, ㅃ, ㅆ, ㅉ)
+pub fn isDoubleConsonant(c: u32) bool {
+    for (DOUBLE_CONSONANTS) |dc| {
+        if (c == dc) return true;
+    }
+    return false;
+}
+
+/// Check if codepoint is a double vowel (ㅘ, ㅙ, ㅚ, ㅝ, ㅞ, ㅟ, ㅢ)
+pub fn isDoubleVowel(c: u32) bool {
+    for (DOUBLE_VOWELS) |dv| {
+        if (c == dv) return true;
+    }
+    return false;
+}
+
 // Decompose Hangul syllable into jamo components
 pub fn decompose(syllable: u32) ?JamoDecomp {
     if (!isHangulSyllable(syllable)) return null;
@@ -209,6 +252,27 @@ export fn wasm_decompose(syllable: u32, output_ptr: u32) bool {
         return true;
     }
     return false;
+}
+
+// Jamo classification exports
+export fn wasm_isJamo(c: u32) bool {
+    return isJamo(c);
+}
+
+export fn wasm_isConsonant(c: u32) bool {
+    return isConsonant(c);
+}
+
+export fn wasm_isVowel(c: u32) bool {
+    return isVowel(c);
+}
+
+export fn wasm_isDoubleConsonant(c: u32) bool {
+    return isDoubleConsonant(c);
+}
+
+export fn wasm_isDoubleVowel(c: u32) bool {
+    return isDoubleVowel(c);
 }
 
 // Safe decompose with buffer size validation
@@ -409,6 +473,76 @@ test "has final" {
 test "non-Hangul character returns null" {
     try std.testing.expect(decompose('A') == null);
     try std.testing.expect(decompose(0x3042) == null); // ぁ (Hiragana)
+}
+
+test "jamo classification: isJamo" {
+    // Valid jamo
+    try std.testing.expect(isJamo(0x3131)); // ㄱ (first)
+    try std.testing.expect(isJamo(0x3163)); // ㅣ (last)
+    try std.testing.expect(isJamo(0x314F)); // ㅏ (first vowel)
+    try std.testing.expect(isJamo(0x3145)); // ㅅ
+
+    // Not jamo
+    try std.testing.expect(!isJamo(0x3130)); // before range
+    try std.testing.expect(!isJamo(0x3164)); // after range
+    try std.testing.expect(!isJamo(0xAC00)); // 가 (syllable, not jamo)
+    try std.testing.expect(!isJamo('A'));
+}
+
+test "jamo classification: isConsonant" {
+    // Consonants (ㄱ to ㅎ): U+3131 to U+314E
+    try std.testing.expect(isConsonant(0x3131)); // ㄱ
+    try std.testing.expect(isConsonant(0x314E)); // ㅎ
+    try std.testing.expect(isConsonant(0x3134)); // ㄴ
+    try std.testing.expect(isConsonant(0x3139)); // ㄹ
+
+    // Not consonants
+    try std.testing.expect(!isConsonant(0x314F)); // ㅏ (vowel)
+    try std.testing.expect(!isConsonant(0x3163)); // ㅣ (vowel)
+    try std.testing.expect(!isConsonant('A'));
+}
+
+test "jamo classification: isVowel" {
+    // Vowels (ㅏ to ㅣ): U+314F to U+3163
+    try std.testing.expect(isVowel(0x314F)); // ㅏ
+    try std.testing.expect(isVowel(0x3163)); // ㅣ
+    try std.testing.expect(isVowel(0x3153)); // ㅓ
+    try std.testing.expect(isVowel(0x3157)); // ㅗ
+
+    // Not vowels
+    try std.testing.expect(!isVowel(0x3131)); // ㄱ (consonant)
+    try std.testing.expect(!isVowel(0x314E)); // ㅎ (consonant)
+    try std.testing.expect(!isVowel('A'));
+}
+
+test "jamo classification: isDoubleConsonant" {
+    // Double consonants: ㄲ, ㄸ, ㅃ, ㅆ, ㅉ
+    try std.testing.expect(isDoubleConsonant(0x3132)); // ㄲ
+    try std.testing.expect(isDoubleConsonant(0x3138)); // ㄸ
+    try std.testing.expect(isDoubleConsonant(0x3143)); // ㅃ
+    try std.testing.expect(isDoubleConsonant(0x3146)); // ㅆ
+    try std.testing.expect(isDoubleConsonant(0x3149)); // ㅉ
+
+    // Not double consonants
+    try std.testing.expect(!isDoubleConsonant(0x3131)); // ㄱ
+    try std.testing.expect(!isDoubleConsonant(0x3134)); // ㄴ
+    try std.testing.expect(!isDoubleConsonant(0x314F)); // ㅏ (vowel)
+}
+
+test "jamo classification: isDoubleVowel" {
+    // Double vowels: ㅘ, ㅙ, ㅚ, ㅝ, ㅞ, ㅟ, ㅢ
+    try std.testing.expect(isDoubleVowel(0x3158)); // ㅘ
+    try std.testing.expect(isDoubleVowel(0x3159)); // ㅙ
+    try std.testing.expect(isDoubleVowel(0x315A)); // ㅚ
+    try std.testing.expect(isDoubleVowel(0x315D)); // ㅝ
+    try std.testing.expect(isDoubleVowel(0x315E)); // ㅞ
+    try std.testing.expect(isDoubleVowel(0x315F)); // ㅟ
+    try std.testing.expect(isDoubleVowel(0x3162)); // ㅢ
+
+    // Not double vowels
+    try std.testing.expect(!isDoubleVowel(0x314F)); // ㅏ
+    try std.testing.expect(!isDoubleVowel(0x3153)); // ㅓ
+    try std.testing.expect(!isDoubleVowel(0x3131)); // ㄱ (consonant)
 }
 
 test "UTF-8 decoding with valid 3-byte sequence" {

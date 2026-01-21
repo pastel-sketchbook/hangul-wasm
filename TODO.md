@@ -3,7 +3,7 @@
 This document tracks planned enhancements, known issues, and future work for the hangul-wasm library.
 
 **Current Version**: v0.3.0  
-**Test Status**: 35 tests (34 passed, 1 skipped)  
+**Test Status**: 40 tests (39 passed, 1 skipped)  
 **WASM Size**: 4.4KB (ReleaseSmall)
 
 ---
@@ -56,11 +56,8 @@ This document tracks planned enhancements, known issues, and future work for the
   - Requires separate processing logic from 2-Bulsik
   - Estimated effort: ~20 hours
 
-- [ ] **Jamo classification utilities** - Helper functions as documented in rationale
-  - `isVowel(jamo: u32) -> bool`
-  - `isConsonant(jamo: u32) -> bool`
-  - `isDoubleConsonant(jamo: u32) -> bool`
-  - `isDoubleVowel(jamo: u32) -> bool`
+- [x] **Jamo classification utilities** - Added helper functions with WASM exports:
+  - `isJamo`, `isVowel`, `isConsonant`, `isDoubleConsonant`, `isDoubleVowel`
 
 - [ ] **Bulk string composition** - Compose array of jamo back into syllables (inverse of `wasm_decomposeString`)
 

@@ -15,6 +15,7 @@ const allowed_files = [_][]const u8{
     "/hangul-ime.js",
     "/hangul-ime.d.ts",
     "/screenshot.png",
+    "/favicon.svg",
     "/README.md",
     "/",
 };
@@ -31,6 +32,7 @@ const mime_types = [_]MimeType{
     .{ .ext = ".ts", .mime = "application/typescript; charset=utf-8" },
     .{ .ext = ".wasm", .mime = "application/wasm" },
     .{ .ext = ".png", .mime = "image/png" },
+    .{ .ext = ".svg", .mime = "image/svg+xml" },
     .{ .ext = ".md", .mime = "text/markdown; charset=utf-8" },
     .{ .ext = ".css", .mime = "text/css; charset=utf-8" },
     .{ .ext = ".json", .mime = "application/json; charset=utf-8" },

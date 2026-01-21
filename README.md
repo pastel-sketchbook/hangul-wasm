@@ -75,17 +75,21 @@ Core Functions:
 - **`wasm_ime_create() -> u32`**: Create IME instance; returns handle (0 on failure)
 - **`wasm_ime_destroy(handle: u32) -> void`**: Destroy IME instance and free resources
 - **`wasm_ime_reset(handle: u32) -> void`**: Reset IME composition state
-- **`wasm_ime_processKey(handle: u32, jamo_index: i8, result_ptr: u32) -> bool`**: Process keystroke; writes action/codepoints to result buffer (12 bytes)
+- **`wasm_ime_processKey(handle: u32, jamo_index: i8, result_ptr: u32) -> bool`**: Process keystroke (2-Bulsik); writes action/codepoints to result buffer (12 bytes)
+- **`wasm_ime_processKey3(handle: u32, ascii: u8, result_ptr: u32) -> bool`**: Process keystroke (3-Bulsik); writes action/codepoints to result buffer (16 bytes)
 - **`wasm_ime_backspace(handle: u32) -> u32`**: Process backspace; returns updated codepoint (0 if empty)
+- **`wasm_ime_commit(handle: u32) -> u32`**: Commit current composition and reset state; returns finalized codepoint
 - **`wasm_ime_getState(handle: u32, output_ptr: u32) -> void`**: Get current state for debugging (6 bytes: initial, initial_flag, medial, medial_flag, final, final_flag)
 
 ### IME Features
 
-- **2-Bulsik (Dubeolsik) Keyboard Layout**: Standard Korean keyboard layout
+- **2-Bulsik (Dubeolsik) Keyboard Layout**: Standard Korean keyboard layout (default)
+- **3-Bulsik (Sebeolsik) Keyboard Layout**: Traditional three-set layout with separate keys for initial/final consonants
 - **Real-time Composition**: Convert keystrokes into Hangul syllables as you type
 - **Double Jamo Support**: Automatic handling of ㄲ, ㄸ, ㅃ, ㅆ, ㅉ (consonants) and ㅘ, ㅝ, ㅢ, etc. (vowels)
-- **Syllable Splitting**: Intelligently splits syllables when needed (e.g., typing 한 + ㅏ → 하 + ㄴㅏ)
+- **Syllable Splitting**: Intelligently splits syllables when needed (e.g., typing 한 + ㅏ → 하 + ㄴㅏ) — 2-Bulsik only
 - **Backspace Decomposition**: Step-by-step decomposition (한 → 하 → ㅎ → ∅)
+- **Blur Handling**: Automatically commits composition when input loses focus
 - **Stateful Processing**: Maintains composition buffer for complex input sequences
 
 ### Technical Highlights
@@ -155,7 +159,7 @@ zig build-obj hangul.zig -target wasm32-freestanding -O Debug
 
 ### Build Profiles
 
-- **ReleaseSmall** (9.5 KB): Optimized binary size, ideal for web distribution
+- **ReleaseSmall** (4.9 KB): Optimized binary size, ideal for web distribution
 - **ReleaseFast** (97 KB): Optimized runtime performance
 - **Debug**: Full debug information for development
 
@@ -164,47 +168,74 @@ zig build-obj hangul.zig -target wasm32-freestanding -O Debug
 Run tests using Taskfile or directly:
 
 ```bash
-task test             # Run all tests
+task test             # Run Zig unit tests (58 tests)
 task test:verbose     # Run with verbose output
+task test:e2e         # Run Playwright end-to-end tests (13 tests)
 task check:all        # Format check + lint + test + build
 ```
 
 Or run directly:
 
 ```bash
-zig test hangul.zig
+zig test hangul.zig                    # Unit tests
+bunx playwright test                   # E2E tests (requires demo server)
 ```
 
 ### Test Suite
 
-The implementation includes 32 tests covering:
+The implementation includes **71 tests** (58 unit + 13 e2e):
 
-**Core decomposition/composition:**
+**Unit Tests (Zig - 58 tests):**
+
+*Core decomposition/composition:*
 - Validates correct decomposition of boundary and mid-range syllables
 - Tests 가 (U+AC00, first syllable) with no final consonant
 - Tests 한 (U+D55C, mid-range) with final consonant
 - Verifies compatibility jamo output
 - Exhaustive roundtrip testing of all 11,172 Hangul syllables
 
-**IME (Input Method Editor):**
+*IME (Input Method Editor):*
 - 2-Bulsik keyboard layout mapping
 - Double jamo detection (initial, medial, final consonants)
 - Syllable splitting and composition
 - Double final consonant splitting (e.g., ㄺ → ㄹ + ㄱ)
 - Backspace decomposition
 
-**UTF-8 and validation:**
+*UTF-8 and validation:*
 - UTF-8 decoding for Korean text
 - Invalid jamo combination rejection
 - Buffer validation for WASM exports
 
+**End-to-End Tests (Playwright - 13 tests):**
+
+*2-Bulsik IME:*
+- Typing 한글 and 안녕
+- Space key finalization
+- Backspace decomposition
+- Double consonants (ㅆ)
+- Final consonant splitting
+
+*3-Bulsik IME:*
+- Tab switching between layouts
+- Typing 한글 in 3-Bulsik mode
+
+*Blur handling:*
+- Composition commits on focus loss
+
+*Tools:*
+- Decompose and compose functions
+
 ### All Tests Passing
 
-```
-31 passed; 1 skipped; 0 failed.
+```bash
+# Unit tests
+57 passed; 1 skipped; 0 failed.
+
+# E2E tests
+13 passed
 ```
 
-The skipped test (`wasm_decompose_safe buffer validation`) only runs on WASM targets.
+The skipped unit test (`wasm_decompose_safe buffer validation`) only runs on WASM targets.
 
 ## Usage
 
@@ -332,8 +363,16 @@ async function initializeIme() {
 // Type "gksrmf" → 한글
 // Type "dkssud" → 안녕
 
+// Switching to 3-Bulsik layout:
+ime2.setLayoutMode('3bulsik');
+// In 3-Bulsik: separate keys for initial/final consonants
+// Type with direct jamo mapping (no syllable splitting)
+
 // Backspace behavior:
 // 한 (backspace) → 하 (backspace) → ㅎ (backspace) → (empty)
+
+// Blur handling:
+// When input loses focus, any in-progress composition is committed automatically
 ```
 
 ### Debug Mode
@@ -367,7 +406,9 @@ An HTML demo (`index.html`) is included with:
 - **Composition Tool**: Combine jamo to create syllables
 - **Property Checker**: Inspect individual character properties
 - **String Processor**: Decompose entire Korean text
-- **한글 IME**: Type Korean using standard QWERTY keyboard with 2-Bulsik layout (toggle with Shift+Space)
+- **한글 IME**: Type Korean using standard QWERTY keyboard
+  - 2-Bulsik (두벌식) layout — standard, toggle with Shift+Space
+  - 3-Bulsik (세벌식) layout — click tab button to switch
 
 <img src="screenshot.png" alt="hangul-wasm Demo" width="100%" />
 
@@ -471,7 +512,20 @@ The WASM module uses a simple 16KB static buffer allocator for memory management
 | `compose` | O(19 + 21 + 28) | Linear jamo lookup (worst case) |
 | `decomposeString` | O(n) | Linear scan with UTF-8 decoding |
 
-Typical WASM execution is 10-100x faster than equivalent JavaScript for large text processing.
+### Benchmark Results
+
+Run `task benchmark` to compare WASM vs pure JavaScript performance:
+
+```
+Single Operations (IME use case):
+  WASM decompose:  ~1.5-2x faster than JavaScript
+  WASM compose:    ~1.5-2x faster than JavaScript
+
+Bulk Operations (1000+ iterations):
+  JavaScript can be faster due to WASM function call overhead
+```
+
+**Recommendation:** Use WASM for interactive IME (single operations per keystroke). For batch processing of large texts, benchmark both approaches for your specific use case.
 
 ## Compatibility
 
@@ -493,12 +547,12 @@ This port focuses on the core decomposition/composition functionality:
 - [x] `compose` (similar to `assemble`)
 - [x] `hasFinal` / `getInitial` / `getMedial` / `getFinal`
 - [x] String processing with UTF-8 support
+- [x] Keyboard input method handling (2-Bulsik and 3-Bulsik layouts)
+- [x] Jamo classification utilities (`isJamo`, `isVowel`, `isConsonant`)
 
 **Not Implemented (Advanced Features):**
 - [ ] `search` / `Searcher` (advanced pattern matching)
 - [ ] `rangeSearch` (highlight/range detection)
-- [ ] Vowel/consonant classification utilities
-- [ ] Keyboard input method handling (Dubeol vs. Sebeol)
 
 These can be added if needed; the core algorithmic foundation is in place.
 
@@ -515,6 +569,7 @@ These can be added if needed; the core algorithmic foundation is in place.
 ### Rationale & Design
 
 - [**0001: Hangul Decomposition Algorithm**](./docs/rationale/0001_hangul_decomposition_algorithm.md) — Mathematical foundations of O(1) composition/decomposition, UTF-8 handling, boundary conditions, and algorithmic correctness guarantees.
+- [**0002: ohi.js IME Port Strategy**](./docs/rationale/0002_ohi_js_ime_port_strategy.md) — Design analysis for porting ohi.js IME, including 2-Bulsik and 3-Bulsik keyboard layouts.
 - [**0003: http.zig Static Server**](./docs/rationale/0003_http_zig_static_server.md) — Rationale for replacing Python server with native Zig/http.zig server.
 
 ### Development Guidelines
@@ -545,8 +600,10 @@ Use `task pre:commit` before committing to ensure formatting and tests pass.
 ```bash
 task fmt              # Format code
 task fmt:check        # Check formatting (CI-friendly)
-task test             # Run test suite
+task test             # Run Zig unit test suite
 task test:verbose     # Verbose test output
+task test:e2e         # Run Playwright e2e tests
+task benchmark        # Run WASM vs JavaScript benchmarks
 task build:wasm       # Build optimized WASM
 task build:server     # Build http.zig static file server
 task check:all        # Full quality check

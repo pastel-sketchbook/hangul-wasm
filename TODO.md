@@ -2,8 +2,8 @@
 
 This document tracks planned enhancements, known issues, and future work for the hangul-wasm library.
 
-**Current Version**: v0.3.0  
-**Test Status**: 44 tests (43 passed, 1 skipped)  
+**Current Version**: v0.4.0  
+**Test Status**: 58 tests (57 passed, 1 skipped)  
 **WASM Size**: 4.9KB (ReleaseSmall)
 
 ---
@@ -51,10 +51,12 @@ This document tracks planned enhancements, known issues, and future work for the
 
 ### Features
 
-- [ ] **3-Bulsik (Sebeolsik) keyboard layout** - Add support for the three-set layout
-  - Design analysis complete in `docs/rationale/0002_ohi_js_ime_port_strategy.md`
-  - Requires separate processing logic from 2-Bulsik
-  - Estimated effort: ~20 hours
+- [x] **3-Bulsik (Sebeolsik) keyboard layout** - Added support for the three-set layout
+  - Design analysis in `docs/rationale/0002_ohi_js_ime_port_strategy.md`
+  - Separate state machine (`processCho3Bulsik`, `processJung3Bulsik`, `processJong3Bulsik`)
+  - No syllable splitting (unlike 2-Bulsik)
+  - WASM export: `wasm_ime_processKey3()`
+  - JavaScript integration: `HangulIme.setLayoutMode('3bulsik')`
 
 - [x] **Jamo classification utilities** - Added helper functions with WASM exports:
   - `isJamo`, `isVowel`, `isConsonant`, `isDoubleConsonant`, `isDoubleVowel`

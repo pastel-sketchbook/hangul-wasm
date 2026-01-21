@@ -1040,6 +1040,202 @@ test "double final consonant splitting" {
     try std.testing.expectEqual(@as(u32, 0xAC00), r2.current_codepoint); // 가 (U+AC00) - ㄱ+ㅏ
 }
 
+// ============================================================================
+// 3-Bulsik Tests
+// ============================================================================
+
+test "3-bulsik: mapping table size" {
+    // Verify the lookup table has exactly 94 entries (ASCII 33-126)
+    try std.testing.expectEqual(@as(usize, 94), LAYOUT_3BULSIK_LOOKUP.len);
+}
+
+test "3-bulsik: mapping invalid ASCII" {
+    // ASCII outside 33-126 should return null
+    try std.testing.expect(mapKeycode3Bulsik(32) == null); // space
+    try std.testing.expect(mapKeycode3Bulsik(0) == null);
+    try std.testing.expect(mapKeycode3Bulsik(127) == null);
+}
+
+test "3-bulsik: mapping initial consonants (cho)" {
+    // Test some initial consonant mappings from ohi.js
+    // 'k' (ASCII 107) maps to 93 → cho index 1 (ㄱ)
+    const k_token = mapKeycode3Bulsik('k');
+    try std.testing.expect(k_token != null);
+    switch (k_token.?) {
+        .cho => |idx| try std.testing.expectEqual(@as(u8, 1), idx),
+        else => return error.UnexpectedTokenType,
+    }
+
+    // 'j' (ASCII 106) maps to 115 → cho index 23 (ㅇ)
+    const j_token = mapKeycode3Bulsik('j');
+    try std.testing.expect(j_token != null);
+    switch (j_token.?) {
+        .cho => |idx| try std.testing.expectEqual(@as(u8, 23), idx),
+        else => return error.UnexpectedTokenType,
+    }
+}
+
+test "3-bulsik: mapping medial vowels (jung)" {
+    // 'f' (ASCII 102) maps to 66 → jung index 31 (ㅏ)
+    const f_token = mapKeycode3Bulsik('f');
+    try std.testing.expect(f_token != null);
+    switch (f_token.?) {
+        .jung => |idx| try std.testing.expectEqual(@as(u8, 31), idx),
+        else => return error.UnexpectedTokenType,
+    }
+
+    // 'd' (ASCII 100) maps to 86 → jung index 51 (ㅣ)
+    const d_token = mapKeycode3Bulsik('d');
+    try std.testing.expect(d_token != null);
+    switch (d_token.?) {
+        .jung => |idx| try std.testing.expectEqual(@as(u8, 51), idx),
+        else => return error.UnexpectedTokenType,
+    }
+}
+
+test "3-bulsik: mapping final consonants (jong)" {
+    // '!' (ASCII 33) maps to 2 → jong index 2
+    const exclaim_token = mapKeycode3Bulsik('!');
+    try std.testing.expect(exclaim_token != null);
+    switch (exclaim_token.?) {
+        .jong => |idx| try std.testing.expectEqual(@as(u8, 2), idx),
+        else => return error.UnexpectedTokenType,
+    }
+
+    // 'A' (ASCII 65) maps to 7 → jong index 7
+    const a_upper_token = mapKeycode3Bulsik('A');
+    try std.testing.expect(a_upper_token != null);
+    switch (a_upper_token.?) {
+        .jong => |idx| try std.testing.expectEqual(@as(u8, 7), idx),
+        else => return error.UnexpectedTokenType,
+    }
+}
+
+test "3-bulsik: mapping punctuation (other)" {
+    // '&' (ASCII 38) maps to 8220 (left double quote) → other
+    const amp_token = mapKeycode3Bulsik('&');
+    try std.testing.expect(amp_token != null);
+    switch (amp_token.?) {
+        .other => |cp| try std.testing.expectEqual(@as(u32, 8220), cp),
+        else => return error.UnexpectedTokenType,
+    }
+
+    // ')' (ASCII 41) maps to 126 (~) → other (not a Hangul component)
+    const paren_token = mapKeycode3Bulsik(')');
+    try std.testing.expect(paren_token != null);
+    switch (paren_token.?) {
+        .other => |cp| try std.testing.expectEqual(@as(u32, 126), cp),
+        else => return error.UnexpectedTokenType,
+    }
+
+    // '~' (ASCII 126) maps to 8251 (※) → other
+    const tilde_token = mapKeycode3Bulsik('~');
+    try std.testing.expect(tilde_token != null);
+    switch (tilde_token.?) {
+        .other => |cp| try std.testing.expectEqual(@as(u32, 8251), cp),
+        else => return error.UnexpectedTokenType,
+    }
+}
+
+test "3-bulsik: type single cho (initial)" {
+    var state = ImeState.init();
+
+    // Type ㄱ (cho index 1)
+    const result = processCho3Bulsik(&state, 1);
+    try std.testing.expectEqual(.replace, result.action);
+    try std.testing.expectEqual(@as(u32, 0x3131), result.current_codepoint); // ㄱ
+    try std.testing.expectEqual(@as(i8, 1), state.initial);
+}
+
+test "3-bulsik: type 가 (cho + jung)" {
+    var state = ImeState.init();
+
+    // Type ㄱ (cho 1) + ㅏ (jung 31)
+    _ = processCho3Bulsik(&state, 1);
+    const result = processJung3Bulsik(&state, 31);
+
+    try std.testing.expectEqual(.replace, result.action);
+    try std.testing.expectEqual(@as(u32, 0xAC00), result.current_codepoint); // 가
+}
+
+test "3-bulsik: type 간 (cho + jung + jong)" {
+    var state = ImeState.init();
+
+    // Type ㄱ (cho 1) + ㅏ (jung 31) + ㄴ (jong 4)
+    _ = processCho3Bulsik(&state, 1);
+    _ = processJung3Bulsik(&state, 31);
+    const result = processJong3Bulsik(&state, 4);
+
+    try std.testing.expectEqual(.replace, result.action);
+    try std.testing.expectEqual(@as(u32, 0xAC04), result.current_codepoint); // 간
+}
+
+test "3-bulsik: double cho ㄲ" {
+    var state = ImeState.init();
+
+    // Type ㄱ twice
+    _ = processCho3Bulsik(&state, 1);
+    const result = processCho3Bulsik(&state, 1);
+
+    try std.testing.expectEqual(.replace, result.action);
+    try std.testing.expectEqual(@as(u32, 0x3132), result.current_codepoint); // ㄲ
+}
+
+test "3-bulsik: double jung ㅘ" {
+    var state = ImeState.init();
+
+    // Type ㄱ + ㅗ + ㅏ → 과
+    _ = processCho3Bulsik(&state, 1);
+    _ = processJung3Bulsik(&state, 39); // ㅗ
+    const result = processJung3Bulsik(&state, 31); // ㅏ
+
+    try std.testing.expectEqual(.replace, result.action);
+    try std.testing.expectEqual(@as(u32, 0xACFC), result.current_codepoint); // 과
+}
+
+test "3-bulsik: double jong ㄳ" {
+    var state = ImeState.init();
+
+    // Type 간 + ㅅ → 갃 (ㄱ + ㅏ + ㄳ)
+    _ = processCho3Bulsik(&state, 1); // ㄱ
+    _ = processJung3Bulsik(&state, 31); // ㅏ
+    _ = processJong3Bulsik(&state, 1); // ㄱ
+    const result = processJong3Bulsik(&state, 19); // ㅅ → forms ㄳ
+
+    try std.testing.expectEqual(.replace, result.action);
+    // 갃 = ㄱ + ㅏ + ㄳ = U+AC03
+    try std.testing.expectEqual(@as(u32, 0xAC03), result.current_codepoint);
+}
+
+test "3-bulsik: new cho commits previous syllable" {
+    var state = ImeState.init();
+
+    // Type 가 then new cho
+    _ = processCho3Bulsik(&state, 1); // ㄱ
+    _ = processJung3Bulsik(&state, 31); // ㅏ → 가
+    const result = processCho3Bulsik(&state, 4); // ㄴ
+
+    try std.testing.expectEqual(.emit_and_new, result.action);
+    try std.testing.expectEqual(@as(u32, 0xAC00), result.prev_codepoint); // 가
+    try std.testing.expectEqual(@as(u32, 0x3134), result.current_codepoint); // ㄴ
+}
+
+test "3-bulsik: no syllable splitting (unlike 2-bulsik)" {
+    var state = ImeState.init();
+
+    // Type 간 (ㄱ + ㅏ + ㄴ) then jung ㅏ
+    // In 3-bulsik: should emit 간 and start new syllable with ㅏ
+    // Unlike 2-bulsik which would split to 가 + 나
+    _ = processCho3Bulsik(&state, 1); // ㄱ
+    _ = processJung3Bulsik(&state, 31); // ㅏ
+    _ = processJong3Bulsik(&state, 4); // ㄴ → 간
+    const result = processJung3Bulsik(&state, 31); // ㅏ
+
+    try std.testing.expectEqual(.emit_and_new, result.action);
+    try std.testing.expectEqual(@as(u32, 0xAC04), result.prev_codepoint); // 간 (not 가)
+    try std.testing.expectEqual(@as(u32, 0x314F), result.current_codepoint); // ㅏ (single jamo, not 나)
+}
+
 test "ime commit finalizes composition" {
     // Test that commit returns the current syllable and resets state
     var state = ImeState.init();
@@ -1228,6 +1424,66 @@ const LAYOUT_2BULSIK = [_]u8{
     // Vowels: k=ㅏ, o=ㅐ, i=ㅑ, O=ㅒ, j=ㅓ, p=ㅔ, u=ㅕ, P=ㅖ, h=ㅗ, hk=ㅘ, ho=ㅙ, hl=ㅚ
     // y=ㅛ, n=ㅜ, nj=ㅝ, np=ㅞ, nl=ㅟ, b=ㅠ, m=ㅡ, ml=ㅢ, l=ㅣ
 };
+
+// ============================================================================
+// 3-Bulsik (Sebeolsik) Keyboard Layout
+// ============================================================================
+
+/// 3-Bulsik lookup table from ohi.js lines 204-299
+/// Maps ASCII codes 33-126 to token values:
+/// - 93-122: Initial consonant (cho) → subtract 92 to get ohi index
+/// - 66-86: Medial vowel (jung) → subtract 35 to get ohi index
+/// - 1-30: Final consonant (jong) → use as-is for ohi index
+/// - Other values: Literal characters (punctuation, etc.)
+const LAYOUT_3BULSIK_LOOKUP = [94]u16{
+    // Directly from ohi.js lines 204-299 (94 elements for ASCII 33-126)
+    2, 183, 24, 15, 14, 8220, 120, 39, 126, 8221, // ! " # $ % & ' ( ) *
+    43, 44, 41, 46, 74, 119, 30, 22, 18, 78, // + , - . / 0 1 2 3 4
+    83, 68, 73, 85, 79, 52, 110, 44, 62, 46, // 5 6 7 8 9 : ; < = >
+    33, 10, 7, 63, 27, 12, 5, 11, 69, 48, // ? @ A B C D E F G H
+    55, 49, 50, 51, 34, 45, 56, 57, 29, 16, // I J K L M N O P Q R
+    6, 13, 54, 3, 28, 20, 53, 26, 40, 58, // S T U V W X Y Z [ \
+    60, 61, 59, 42, 23, 79, 71, 86, 72, 66, // ] ^ _ ` a b c d
+    84, 96, 109, 115, 93, 116, 122, 113, 118, 121, // e f g h i j k l m n
+    21, 67, 4, 70, 99, 74, 9, 1, 101, 17, // o p q r s t u v w x
+    37, 92, 47, 8251, // y z { |
+};
+
+/// Token type returned by 3-Bulsik key mapping
+const K3TokenTag = enum { cho, jung, jong, other };
+
+const K3Token = union(K3TokenTag) {
+    cho: u8, // Initial consonant (1-30)
+    jung: u8, // Medial vowel (31-51)
+    jong: u8, // Final consonant (1-30)
+    other: u32, // Literal codepoint to insert
+};
+
+/// Map ASCII keycode to 3-Bulsik token
+/// Returns null for invalid ASCII range
+fn mapKeycode3Bulsik(ascii: u8) ?K3Token {
+    if (ascii < 33 or ascii > 126) return null;
+    const mapped: u16 = LAYOUT_3BULSIK_LOOKUP[ascii - 33];
+
+    // Classify based on ohi.js Hangul3() lines 300-332:
+    // cho: c > 92 && c < 123 → cho_idx = c - 92 (1-30)
+    // jung: c > 65 && c < 87 → jung_idx = c - 35 (31-51)
+    // jong: c < 31 → jong_idx = c (1-30)
+    if (mapped > 92 and mapped < 123) {
+        return .{ .cho = @intCast(mapped - 92) };
+    }
+    if (mapped > 65 and mapped < 87) {
+        return .{ .jung = @intCast(mapped - 35) }; // ohi.js: c - 35 gives 31-51
+    }
+    if (mapped >= 1 and mapped <= 30) {
+        return .{ .jong = @intCast(mapped) };
+    }
+    return .{ .other = mapped };
+}
+
+// ============================================================================
+// 2-Bulsik (Dubeolsik) Keyboard Layout
+// ============================================================================
 
 // Actual keyboard mapping following ohi.js (lines 119-146)
 // This maps ASCII code points to jamo indices
@@ -1511,6 +1767,133 @@ fn processVowel2Bulsik(state: *ImeState, jamo_index: i8) KeyResult {
     return result;
 }
 
+// ============================================================================
+// 3-Bulsik (Sebeolsik) State Machine
+// Based on ohi.js Hangul3() lines 300-332
+// Key difference from 2-Bulsik: No syllable splitting - cho/jung/jong are explicit
+// ============================================================================
+
+/// Process initial consonant (cho) in 3-Bulsik mode
+fn processCho3Bulsik(state: *ImeState, cho_index: u8) KeyResult {
+    var result: KeyResult = .{
+        .action = .replace,
+        .prev_codepoint = 0,
+        .current_codepoint = 0,
+    };
+
+    // If have existing initial without medial, try double initial
+    if (state.initial > 0 and state.medial == 0 and state.initial_flag == 0) {
+        const double_idx = detectDoubleJamo(.initial, @intCast(state.initial), cho_index);
+        if (double_idx != 0) {
+            state.initial = @intCast(double_idx);
+            state.initial_flag = 1;
+            result.action = .replace;
+            result.current_codepoint = state.toCodepoint();
+            return result;
+        }
+    }
+
+    // If have any existing composition, emit it first
+    if (!state.isEmpty()) {
+        result.action = .emit_and_new;
+        result.prev_codepoint = state.toCodepoint();
+    }
+
+    // Start new syllable with cho
+    state.reset();
+    state.initial = @intCast(cho_index);
+    state.initial_flag = 0;
+    result.current_codepoint = state.toCodepoint();
+
+    return result;
+}
+
+/// Process medial vowel (jung) in 3-Bulsik mode
+fn processJung3Bulsik(state: *ImeState, jung_index: u8) KeyResult {
+    var result: KeyResult = .{
+        .action = .replace,
+        .prev_codepoint = 0,
+        .current_codepoint = 0,
+    };
+
+    // If have medial but no final, try double medial
+    if (state.medial > 0 and state.final == 0 and state.medial_flag == 0) {
+        const double_idx = detectDoubleJamo(.medial, @intCast(state.medial), jung_index);
+        if (double_idx != 0) {
+            state.medial = @intCast(double_idx);
+            state.medial_flag = 1;
+            result.action = .replace;
+            result.current_codepoint = state.toCodepoint();
+            return result;
+        }
+        // Cannot double, mark for new syllable
+        state.medial = -1;
+    }
+
+    // If syllable already has medial or is in invalid state, emit and start new
+    if ((state.initial == 0 and state.medial == 0) or // Empty state, just add jung
+        (state.initial > 0 and state.medial == 0))
+    { // Have cho, add jung
+        state.medial = @intCast(jung_index);
+        state.medial_flag = 0;
+        result.action = .replace;
+        result.current_codepoint = state.toCodepoint();
+    } else {
+        // Have complete syllable or invalid state, emit and start new
+        if (!state.isEmpty()) {
+            result.action = .emit_and_new;
+            result.prev_codepoint = state.toCodepoint();
+        }
+        state.reset();
+        state.medial = @intCast(jung_index);
+        result.current_codepoint = state.toCodepoint();
+    }
+
+    return result;
+}
+
+/// Process final consonant (jong) in 3-Bulsik mode
+fn processJong3Bulsik(state: *ImeState, jong_index: u8) KeyResult {
+    var result: KeyResult = .{
+        .action = .replace,
+        .prev_codepoint = 0,
+        .current_codepoint = 0,
+    };
+
+    // If have final already, try double final
+    if (state.final > 0 and state.final_flag == 0) {
+        const double_idx = detectDoubleJamo(.final, @intCast(state.final), jong_index);
+        if (double_idx != 0) {
+            state.final = @intCast(double_idx);
+            state.final_flag = 1;
+            result.action = .replace;
+            result.current_codepoint = state.toCodepoint();
+            return result;
+        }
+        // Cannot double, mark for new syllable
+        state.final = -1;
+    }
+
+    // Need cho + jung to add jong
+    if (state.initial > 0 and state.medial > 0 and state.final == 0) {
+        state.final = @intCast(jong_index);
+        state.final_flag = 0;
+        result.action = .replace;
+        result.current_codepoint = state.toCodepoint();
+    } else {
+        // Invalid state for jong, emit and start new with just jong
+        if (!state.isEmpty()) {
+            result.action = .emit_and_new;
+            result.prev_codepoint = state.toCodepoint();
+        }
+        state.reset();
+        state.final = @intCast(jong_index);
+        result.current_codepoint = state.toCodepoint();
+    }
+
+    return result;
+}
+
 /// Process backspace - decomposes syllable step by step
 /// Based on ohi.js keydownHandler() lines 418-427
 fn processBackspace(state: *ImeState) ?u32 {
@@ -1641,6 +2024,78 @@ export fn wasm_ime_commit(handle: u32) u32 {
     state.reset();
 
     return codepoint;
+}
+
+/// Process keystroke in 3-Bulsik layout
+/// @param handle: IME instance pointer
+/// @param ascii: ASCII keycode (33-126)
+/// @param result_ptr: Pointer to output buffer (16 bytes = 4 × u32)
+/// @returns true if key was handled as Hangul
+///
+/// Output buffer format (4 × u32):
+/// [0] action: 0=no_change, 1=replace, 2=emit_and_new, 3=literal
+/// [1] prev_codepoint: Previous character (if action=emit_and_new)
+/// [2] current_codepoint: Current character
+/// [3] literal_codepoint: Literal character to insert (if action=literal)
+export fn wasm_ime_processKey3(
+    handle: u32,
+    ascii: u8,
+    result_ptr: u32,
+) bool {
+    if (handle == 0 or result_ptr == 0) return false;
+
+    const state: *ImeState = @ptrFromInt(handle);
+    const output: [*]u32 = @ptrFromInt(result_ptr);
+
+    // Map ASCII to 3-Bulsik token
+    const token = mapKeycode3Bulsik(ascii);
+    if (token == null) {
+        // Invalid ASCII range
+        output[0] = 0; // no_change
+        output[1] = 0;
+        output[2] = 0;
+        output[3] = 0;
+        return false;
+    }
+
+    switch (token.?) {
+        .cho => |idx| {
+            const result = processCho3Bulsik(state, idx);
+            output[0] = @intFromEnum(result.action);
+            output[1] = result.prev_codepoint;
+            output[2] = result.current_codepoint;
+            output[3] = 0;
+        },
+        .jung => |idx| {
+            const result = processJung3Bulsik(state, idx);
+            output[0] = @intFromEnum(result.action);
+            output[1] = result.prev_codepoint;
+            output[2] = result.current_codepoint;
+            output[3] = 0;
+        },
+        .jong => |idx| {
+            const result = processJong3Bulsik(state, idx);
+            output[0] = @intFromEnum(result.action);
+            output[1] = result.prev_codepoint;
+            output[2] = result.current_codepoint;
+            output[3] = 0;
+        },
+        .other => |cp| {
+            // Literal character - commit current composition if any
+            if (!state.isEmpty()) {
+                output[0] = 2; // emit_and_new
+                output[1] = state.toCodepoint();
+                state.reset();
+            } else {
+                output[0] = 3; // literal (custom action)
+                output[1] = 0;
+            }
+            output[2] = 0;
+            output[3] = cp; // The literal character to insert
+        },
+    }
+
+    return true;
 }
 
 // Build configuration comment:

@@ -22,9 +22,14 @@ const LAYOUT_2BULSIK = {
     'S': 6,  'T': 22, 'U': 37, 'V': 29, 'W': 25, 'X': 28, 'Y': 43, 'Z': 27
 };
 
+// IME Layout modes
+const LAYOUT_MODE_2BULSIK = '2bulsik';
+const LAYOUT_MODE_3BULSIK = '3bulsik';
+
 const ACTION_NO_CHANGE = 0;
 const ACTION_REPLACE = 1;
 const ACTION_EMIT_AND_NEW = 2;
+const ACTION_LITERAL = 3; // For 3-Bulsik punctuation
 
 // Debug flag - set to true to enable console logging
 let DEBUG = false;
@@ -39,9 +44,11 @@ export class HangulIme {
         this.compositionStart = -1; // Track where composition started in the text field
         this.keySequence = []; // Track keys pressed for current syllable
         this.debug = options.debug !== undefined ? options.debug : DEBUG;
+        this.layoutMode = options.layout || LAYOUT_MODE_2BULSIK; // Default to 2-Bulsik
         
         // Allocate result buffer once (reusable)
-        this.resultBuffer = this.wasm.wasm_alloc(12); // 3 × u32
+        // 4 × u32 for 3-Bulsik (includes literal codepoint)
+        this.resultBuffer = this.wasm.wasm_alloc(16);
         
         if (this.handle === 0 || this.resultBuffer === 0) {
             throw new Error('Failed to initialize IME (WASM allocation failed)');
@@ -50,13 +57,35 @@ export class HangulIme {
     
     destroy() {
         if (this.resultBuffer !== 0) {
-            this.wasm.wasm_free(this.resultBuffer, 12);
+            this.wasm.wasm_free(this.resultBuffer, 16);
             this.resultBuffer = 0;
         }
         if (this.handle !== 0) {
             this.wasm.wasm_ime_destroy(this.handle);
             this.handle = 0;
         }
+    }
+    
+    /**
+     * Set the keyboard layout mode
+     * @param {'2bulsik'|'3bulsik'} mode - Layout mode
+     */
+    setLayoutMode(mode) {
+        if (mode === LAYOUT_MODE_2BULSIK || mode === LAYOUT_MODE_3BULSIK) {
+            this.layoutMode = mode;
+            this.reset();
+            if (this.debug) {
+                console.log(`[HangulIme] Layout mode set to: ${mode}`);
+            }
+        }
+    }
+    
+    /**
+     * Get the current keyboard layout mode
+     * @returns {'2bulsik'|'3bulsik'} Current layout mode
+     */
+    getLayoutMode() {
+        return this.layoutMode;
     }
     
     enable() {
@@ -154,10 +183,22 @@ export class HangulIme {
         if (event.key === ' ') return false;
         
         const char = event.key;
+        
+        if (this.layoutMode === LAYOUT_MODE_3BULSIK) {
+            return this.handleKeyPress3Bulsik(char, field);
+        } else {
+            return this.handleKeyPress2Bulsik(char, field);
+        }
+    }
+    
+    /**
+     * Handle key press in 2-Bulsik mode
+     */
+    handleKeyPress2Bulsik(char, field) {
         const jamoIndex = LAYOUT_2BULSIK[char];
         
         if (this.debug) {
-            console.log(`[HangulIme] Key pressed: '${char}' → jamo index: ${jamoIndex}`);
+            console.log(`[HangulIme] 2-Bulsik key: '${char}' → jamo index: ${jamoIndex}`);
         }
         
         if (jamoIndex === undefined) return false; // Not a Korean key
@@ -177,9 +218,66 @@ export class HangulIme {
         const prevCodepoint = view[1];
         const currentCodepoint = view[2];
         
+        return this.handleResult(char, field, action, prevCodepoint, currentCodepoint);
+    }
+    
+    /**
+     * Handle key press in 3-Bulsik mode
+     */
+    handleKeyPress3Bulsik(char, field) {
+        const ascii = char.charCodeAt(0);
+        
+        // 3-Bulsik handles ASCII 33-126
+        if (ascii < 33 || ascii > 126) return false;
+        
         if (this.debug) {
-            console.log(`[HangulIme]   → WASM result: action=${action}, prev=U+${prevCodepoint.toString(16).toUpperCase().padStart(4, '0')}, current=U+${currentCodepoint.toString(16).toUpperCase().padStart(4, '0')} (${String.fromCodePoint(currentCodepoint)})`);
-        }        
+            console.log(`[HangulIme] 3-Bulsik key: '${char}' (ASCII ${ascii})`);
+        }
+        
+        // Process the keystroke through WASM
+        const handled = this.wasm.wasm_ime_processKey3(
+            this.handle,
+            ascii,
+            this.resultBuffer
+        );
+        
+        if (!handled) return false;
+        
+        // Read result from WASM memory (4 × u32 for 3-Bulsik)
+        const view = new Uint32Array(this.memory.buffer, this.resultBuffer, 4);
+        const action = view[0];
+        const prevCodepoint = view[1];
+        const currentCodepoint = view[2];
+        const literalCodepoint = view[3];
+        
+        // Handle literal action (3-Bulsik punctuation)
+        if (action === ACTION_LITERAL) {
+            if (literalCodepoint !== 0) {
+                this.insertChar(field, literalCodepoint);
+            }
+            return true;
+        }
+        
+        // For emit_and_new with literal, insert the literal after handling
+        if (action === ACTION_EMIT_AND_NEW && literalCodepoint !== 0) {
+            this.handleResult(char, field, action, prevCodepoint, 0);
+            this.insertChar(field, literalCodepoint);
+            this.hasComposition = false;
+            this.compositionStart = -1;
+            return true;
+        }
+        
+        return this.handleResult(char, field, action, prevCodepoint, currentCodepoint);
+    }
+    
+    /**
+     * Handle the result from WASM processing
+     */
+    handleResult(char, field, action, prevCodepoint, currentCodepoint) {
+        if (this.debug) {
+            console.log(`[HangulIme]   → WASM result: action=${action}, prev=U+${prevCodepoint.toString(16).toUpperCase().padStart(4, '0')}, current=U+${currentCodepoint.toString(16).toUpperCase().padStart(4, '0')} (${currentCodepoint !== 0 ? String.fromCodePoint(currentCodepoint) : ''})`);
+        }
+        
         // Track key sequence
         if (action === ACTION_EMIT_AND_NEW) {
             // Starting new syllable, reset sequence
@@ -210,7 +308,7 @@ export class HangulIme {
                 // Emit the previous syllable (replace current char with prev)
                 // Then insert the new syllable
                 if (this.debug) {
-                    console.log(`[HangulIme] ACTION_EMIT_AND_NEW: prev=${String.fromCodePoint(prevCodepoint)}, current=${String.fromCodePoint(currentCodepoint)}, compositionStart=${this.compositionStart}`);
+                    console.log(`[HangulIme] ACTION_EMIT_AND_NEW: prev=${prevCodepoint !== 0 ? String.fromCodePoint(prevCodepoint) : ''}, current=${currentCodepoint !== 0 ? String.fromCodePoint(currentCodepoint) : ''}, compositionStart=${this.compositionStart}`);
                 }
                 if (prevCodepoint !== 0 && this.hasComposition && this.compositionStart >= 0) {
                     // Replace the current composition with the emitted syllable
@@ -219,8 +317,13 @@ export class HangulIme {
                 // Start new composition at the next position
                 this.compositionStart = this.compositionStart >= 0 ? this.compositionStart + 1 : field.selectionStart;
                 // Insert the new character
-                this.insertChar(field, currentCodepoint);
-                this.hasComposition = true;
+                if (currentCodepoint !== 0) {
+                    this.insertChar(field, currentCodepoint);
+                    this.hasComposition = true;
+                } else {
+                    this.hasComposition = false;
+                    this.compositionStart = -1;
+                }
                 break;
                 
             case ACTION_NO_CHANGE:

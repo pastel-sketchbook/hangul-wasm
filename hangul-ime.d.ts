@@ -22,11 +22,18 @@ export interface ImeState {
 }
 
 /**
+ * Keyboard layout mode
+ */
+export type LayoutMode = '2bulsik' | '3bulsik';
+
+/**
  * Options for HangulIme constructor
  */
 export interface HangulImeOptions {
   /** Enable debug logging (default: false) */
   debug?: boolean;
+  /** Keyboard layout mode (default: '2bulsik') */
+  layout?: LayoutMode;
 }
 
 /**
@@ -77,7 +84,10 @@ export interface HangulWasmExports {
   wasm_ime_create(): number;
   wasm_ime_destroy(handle: number): void;
   wasm_ime_reset(handle: number): void;
+  /** Process keystroke in 2-Bulsik mode */
   wasm_ime_processKey(handle: number, jamo_index: number, result_ptr: number): boolean;
+  /** Process keystroke in 3-Bulsik mode */
+  wasm_ime_processKey3(handle: number, ascii: number, result_ptr: number): boolean;
   wasm_ime_backspace(handle: number): number;
   wasm_ime_getState(handle: number, state_ptr: number): void;
   /** Commit current composition and reset state. Returns finalized codepoint (0 if empty). */
@@ -133,6 +143,17 @@ export declare class HangulIme {
    * Check if debug mode is enabled
    */
   isDebugEnabled(): boolean;
+  
+  /**
+   * Set the keyboard layout mode
+   * @param mode - '2bulsik' or '3bulsik'
+   */
+  setLayoutMode(mode: LayoutMode): void;
+  
+  /**
+   * Get the current keyboard layout mode
+   */
+  getLayoutMode(): LayoutMode;
   
   /**
    * Reset the IME state (clears current composition)

@@ -586,10 +586,12 @@ fn decodeUtf8Char(bytes: [*]const u8, start: u32, max_len: u32) Utf8Char {
 // WASM Memory Allocation
 // ============================================================================
 
-// Simple static buffer allocator for WASM (no threading required)
+// Simple bump allocator for WASM with reset capability
+// Designed for bounded sessions (e.g., per-page-load or per-session)
 const WASM_BUFFER_SIZE = 16 * 1024; // 16KB buffer
 var wasm_buffer: [WASM_BUFFER_SIZE]u8 align(8) = undefined;
 var wasm_alloc_ptr: u32 = 0;
+var wasm_alloc_count: u32 = 0; // Track number of active allocations
 
 /// WASM export: Allocate memory from the static buffer.
 ///
@@ -607,18 +609,48 @@ export fn wasm_alloc(size: u32) u32 {
     }
     const ptr = @intFromPtr(&wasm_buffer[aligned_ptr]);
     wasm_alloc_ptr = aligned_ptr + size;
+    wasm_alloc_count += 1;
     return @intCast(ptr);
 }
 
-/// WASM export: Free allocated memory (no-op for linear allocator).
+/// WASM export: Free allocated memory.
 ///
-/// This is a no-op since we use a simple linear allocator.
-/// For long-running applications, consider resetting the allocator.
+/// For bump allocator, individual frees are no-ops, but when all allocations
+/// are freed (alloc_count reaches 0), the allocator resets automatically.
+/// This enables bounded session usage where memory is reclaimed after cleanup.
 export fn wasm_free(ptr: u32, size: u32) void {
-    // For simple linear allocator, we don't do anything
-    // In production, use a proper allocator or reset strategy
     _ = ptr;
     _ = size;
+
+    // Decrement allocation count; reset when all freed
+    if (wasm_alloc_count > 0) {
+        wasm_alloc_count -= 1;
+        if (wasm_alloc_count == 0) {
+            // All allocations freed - reset the bump allocator
+            wasm_alloc_ptr = 0;
+        }
+    }
+}
+
+/// WASM export: Reset the allocator completely.
+///
+/// Use this to reclaim all memory at once (e.g., on page unload or session end).
+/// WARNING: All previously allocated pointers become invalid after this call.
+export fn wasm_alloc_reset() void {
+    wasm_alloc_ptr = 0;
+    wasm_alloc_count = 0;
+}
+
+/// WASM export: Get allocator statistics for debugging.
+///
+/// Returns bytes used in the allocator buffer.
+export fn wasm_alloc_used() u32 {
+    return wasm_alloc_ptr;
+}
+
+/// WASM export: Get number of active allocations.
+export fn wasm_alloc_count_active() u32 {
+    return wasm_alloc_count;
 }
 
 // ============================================================================
@@ -1137,6 +1169,71 @@ test "decompose_safe logic validation (host)" {
     // Test character above Hangul range
     const above = decompose(0xD7A4);
     try std.testing.expect(above == null);
+}
+
+test "bump allocator: allocation count tracking (host)" {
+    // Test the allocation counting logic without WASM pointer conversion
+    // Reset to known state
+    wasm_alloc_ptr = 0;
+    wasm_alloc_count = 0;
+
+    try std.testing.expectEqual(@as(u32, 0), wasm_alloc_used());
+    try std.testing.expectEqual(@as(u32, 0), wasm_alloc_count_active());
+
+    // Simulate allocations by directly manipulating state
+    wasm_alloc_ptr = 100;
+    wasm_alloc_count = 2;
+
+    try std.testing.expectEqual(@as(u32, 100), wasm_alloc_used());
+    try std.testing.expectEqual(@as(u32, 2), wasm_alloc_count_active());
+
+    // Free one - count decreases but ptr stays
+    wasm_free(0, 0);
+    try std.testing.expectEqual(@as(u32, 1), wasm_alloc_count_active());
+    try std.testing.expectEqual(@as(u32, 100), wasm_alloc_used()); // Not reset yet
+
+    // Free last - should auto-reset
+    wasm_free(0, 0);
+    try std.testing.expectEqual(@as(u32, 0), wasm_alloc_count_active());
+    try std.testing.expectEqual(@as(u32, 0), wasm_alloc_used()); // Auto-reset!
+}
+
+test "bump allocator: manual reset (host)" {
+    wasm_alloc_ptr = 500;
+    wasm_alloc_count = 5;
+
+    wasm_alloc_reset();
+
+    try std.testing.expectEqual(@as(u32, 0), wasm_alloc_count_active());
+    try std.testing.expectEqual(@as(u32, 0), wasm_alloc_used());
+}
+
+test "bump allocator: wasm-only tests" {
+    // Skip on non-WASM targets since pointer sizes differ
+    if (@import("builtin").target.cpu.arch != .wasm32) return error.SkipZigTest;
+
+    // Reset allocator to known state
+    wasm_alloc_reset();
+
+    // Allocate some memory
+    const ptr1 = wasm_alloc(100);
+    try std.testing.expect(ptr1 != 0);
+    try std.testing.expectEqual(@as(u32, 1), wasm_alloc_count_active());
+
+    const ptr2 = wasm_alloc(200);
+    try std.testing.expect(ptr2 != 0);
+    try std.testing.expectEqual(@as(u32, 2), wasm_alloc_count_active());
+
+    // Free all
+    wasm_free(ptr1, 100);
+    wasm_free(ptr2, 200);
+    try std.testing.expectEqual(@as(u32, 0), wasm_alloc_used());
+
+    // Test allocation failure
+    const huge = wasm_alloc(WASM_BUFFER_SIZE + 1);
+    try std.testing.expectEqual(@as(u32, 0), huge);
+
+    wasm_alloc_reset();
 }
 
 // Build configuration comment:

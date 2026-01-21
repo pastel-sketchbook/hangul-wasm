@@ -1030,3 +1030,177 @@ test "ime commit on partial syllable returns jamo" {
     state.reset();
     try std.testing.expect(state.isEmpty());
 }
+
+// ============================================================================
+// Property-Based / Fuzz Tests
+// ============================================================================
+
+test "fuzz: random 2-bulsik keystroke sequences never panic" {
+    // Property: Any sequence of valid jamo indices should not panic
+    // and should produce valid state transitions
+    var state = ImeState.init();
+
+    // Valid consonant indices: 1-30
+    const consonants = [_]i8{ 1, 2, 4, 7, 8, 9, 17, 18, 19, 21, 22, 24, 25, 26, 27, 28, 29, 30 };
+    // Valid vowel indices: 31-51
+    const vowels = [_]i8{ 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 43, 44, 45, 49, 51 };
+
+    // Generate pseudo-random sequence using simple LCG
+    var seed: u32 = 0xDEADBEEF;
+    const iterations = 1000;
+
+    var i: usize = 0;
+    while (i < iterations) : (i += 1) {
+        // LCG: seed = (a * seed + c) mod m
+        seed = seed *% 1103515245 +% 12345;
+        const rand = (seed >> 16) & 0x7FFF;
+
+        // 50% chance consonant, 50% chance vowel
+        if (rand % 2 == 0) {
+            const idx = rand % consonants.len;
+            const result = processConsonant2Bulsik(&state, consonants[idx]);
+            // Result should always be valid
+            try std.testing.expect(result.action == .no_change or
+                result.action == .replace or
+                result.action == .emit_and_new);
+        } else {
+            const idx = rand % vowels.len;
+            const result = processVowel2Bulsik(&state, vowels[idx]);
+            try std.testing.expect(result.action == .no_change or
+                result.action == .replace or
+                result.action == .emit_and_new);
+        }
+
+        // Verify state is always valid
+        try std.testing.expect(state.initial >= -1 and state.initial <= 30);
+        try std.testing.expect(state.medial >= -1 and state.medial <= 51);
+        try std.testing.expect(state.final >= -1 and state.final <= 30);
+
+        // Occasionally reset (10% chance)
+        if (rand % 10 == 0) {
+            state.reset();
+        }
+    }
+}
+
+test "fuzz: random 3-bulsik keystroke sequences never panic" {
+    // Property: Any valid ASCII keystroke should not panic
+    var state = ImeState.init();
+
+    // Valid ASCII range for 3-Bulsik: 33-126
+    var seed: u32 = 0xCAFEBABE;
+    const iterations = 1000;
+
+    var i: usize = 0;
+    while (i < iterations) : (i += 1) {
+        seed = seed *% 1103515245 +% 12345;
+        const rand = (seed >> 16) & 0x7FFF;
+
+        // Generate ASCII in valid range
+        const ascii: u8 = @intCast(33 + (rand % 94));
+
+        const token = mapKeycode3Bulsik(ascii);
+        if (token) |t| {
+            const result = switch (t) {
+                .cho => |idx| processCho3Bulsik(&state, idx),
+                .jung => |idx| processJung3Bulsik(&state, idx),
+                .jong => |idx| processJong3Bulsik(&state, idx),
+                .other => blk: {
+                    // Other characters commit and emit
+                    state.reset();
+                    break :blk KeyResult{
+                        .action = .emit_and_new,
+                        .prev_codepoint = 0,
+                        .current_codepoint = t.other,
+                    };
+                },
+            };
+            try std.testing.expect(result.action == .no_change or
+                result.action == .replace or
+                result.action == .emit_and_new);
+        }
+
+        // Occasionally reset
+        if (rand % 10 == 0) {
+            state.reset();
+        }
+    }
+}
+
+test "fuzz: backspace never corrupts state" {
+    var state = ImeState.init();
+
+    var seed: u32 = 0x12345678;
+    const iterations = 500;
+    const consonants = [_]i8{ 1, 4, 7, 17, 21, 30 };
+    const vowels = [_]i8{ 31, 35, 39, 44, 51 };
+
+    var i: usize = 0;
+    while (i < iterations) : (i += 1) {
+        seed = seed *% 1103515245 +% 12345;
+        const rand = (seed >> 16) & 0x7FFF;
+
+        // Random action: keystroke or backspace
+        const action = rand % 3;
+        if (action == 0) {
+            // Consonant
+            const idx = rand % consonants.len;
+            _ = processConsonant2Bulsik(&state, consonants[idx]);
+        } else if (action == 1) {
+            // Vowel
+            const idx = rand % vowels.len;
+            _ = processVowel2Bulsik(&state, vowels[idx]);
+        } else {
+            // Backspace
+            _ = processBackspace(&state);
+        }
+
+        // State should always be valid after any operation
+        try std.testing.expect(state.initial >= 0 or state.initial == -1);
+        try std.testing.expect(state.medial >= 0 or state.medial == -1);
+        try std.testing.expect(state.final >= 0 or state.final == -1);
+    }
+}
+
+test "property: decompose then compose roundtrips for valid syllables" {
+    // Property: For any valid syllable, decompose → compose should return original
+    const HANGUL_BASE: u32 = 0xAC00;
+    const HANGUL_END: u32 = 0xD7A3;
+
+    // Test a sample of syllables (every 100th to keep test fast)
+    var syllable: u32 = HANGUL_BASE;
+    while (syllable <= HANGUL_END) : (syllable += 100) {
+        const decomp = hangul.decompose(syllable);
+        try std.testing.expect(decomp != null);
+
+        if (decomp) |d| {
+            const recomposed = compose(d.initial, d.medial, d.final);
+            try std.testing.expect(recomposed != null);
+            try std.testing.expectEqual(syllable, recomposed.?);
+        }
+    }
+}
+
+test "property: all valid jamo combinations produce valid syllables" {
+    // Property: Any valid (initial, medial, final) combination should compose
+    // to a syllable in the valid Hangul range
+    const HANGUL_BASE: u32 = 0xAC00;
+    const HANGUL_END: u32 = 0xD7A3;
+
+    // Test subset: first 5 initials, first 5 medials, first 5 finals
+    for (COMPAT_INITIAL[0..5]) |initial| {
+        for (COMPAT_MEDIAL[0..5]) |medial| {
+            // Test with no final
+            const no_final = compose(initial, medial, 0);
+            try std.testing.expect(no_final != null);
+            try std.testing.expect(no_final.? >= HANGUL_BASE and no_final.? <= HANGUL_END);
+
+            // Test with finals
+            for (COMPAT_FINAL[1..5]) |final| {
+                const with_final = compose(initial, medial, final);
+                try std.testing.expect(with_final != null);
+                try std.testing.expect(with_final.? >= HANGUL_BASE and with_final.? <= HANGUL_END);
+            }
+        }
+    }
+}

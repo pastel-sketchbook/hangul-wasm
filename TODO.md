@@ -2,9 +2,9 @@
 
 This document tracks planned enhancements, known issues, and future work for the hangul-wasm library.
 
-**Current Version**: v0.6.1  
+**Current Version**: v0.6.2  
 **Test Status**: 58 unit tests + 13 e2e tests  
-**WASM Size**: ~6.7KB (ReleaseSmall)
+**WASM Size**: ~6.9KB (ReleaseSmall)
 
 ---
 
@@ -38,6 +38,8 @@ This document tracks planned enhancements, known issues, and future work for the
 - [x] **Fix skipped test** - Added `decompose_safe logic validation (host)` test that validates the same logic without WASM-specific pointer handling
 - [x] **Add integration tests** - Browser-based tests using Playwright (13 tests covering 2-Bulsik, 3-Bulsik, blur handling, and tools)
 - [x] **Add performance benchmarks** - Benchmarks show WASM is 1.5-2x faster for single operations (IME use case), while JS can be faster for bulk due to call overhead
+- [ ] **Benchmark in CI** - Add benchmark step to GitHub Actions to track performance regressions
+- [ ] **Property-based IME fuzz tests** - Random keystroke sequences to catch state machine edge cases
 
 ### IME Improvements
 
@@ -147,7 +149,8 @@ This document tracks planned enhancements, known issues, and future work for the
 
 - [x] **Add inline doc comments** - Zig `///` doc comments for all public functions
 - [ ] **Code examples in docs** - More comprehensive usage examples in README
-- [ ] **Architecture diagram** - Visual representation of WASM/JS boundary
+- [ ] **Architecture diagram** - Mermaid diagram showing WASM/JS boundary and IME state flow
+- [ ] **Update README benchmarks** - Include latest compose() performance (1.85x faster after O(1) optimization)
 
 ### Testing
 

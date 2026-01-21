@@ -105,7 +105,10 @@ Core Functions:
 
 **Memory management:**
 - **`wasm_alloc(size: u32) -> u32`**: Allocate WASM memory; returns byte offset (0 on failure)
-- **`wasm_free(ptr: u32, size: u32) -> void`**: Deallocate WASM memory (no-op in current implementation)
+- **`wasm_free(ptr: u32, size: u32) -> void`**: Free memory; auto-resets allocator when all allocations freed
+- **`wasm_alloc_reset() -> void`**: Reset allocator completely (invalidates all pointers)
+- **`wasm_alloc_used() -> u32`**: Get bytes currently allocated (for debugging)
+- **`wasm_alloc_count_active() -> u32`**: Get number of active allocations (for debugging)
 
 **IME (Input Method Editor) Functions:**
 - **`wasm_ime_create() -> u32`**: Create IME instance; returns handle (0 on failure)

@@ -123,6 +123,38 @@ export class HangulIme {
         // this.updateOverlay(); // DISABLED
     }
     
+    /**
+     * Commit the current composition and reset IME state
+     * Use this when the user moves focus away or explicitly finalizes input
+     * @param {HTMLInputElement|HTMLTextAreaElement} [field] - Optional field to update
+     * @returns {string|null} - The committed character, or null if nothing to commit
+     */
+    commit(field = null) {
+        // Call WASM to commit and get the finalized codepoint
+        const codepoint = this.wasm.wasm_ime_commit(this.handle);
+        
+        if (codepoint === 0) {
+            // Nothing to commit - just reset local state
+            this.hasComposition = false;
+            this.compositionStart = -1;
+            this.keySequence = [];
+            return null;
+        }
+        
+        const char = String.fromCodePoint(codepoint);
+        
+        if (this.debug) {
+            console.log(`[HangulIme] Committed: ${char} (U+${codepoint.toString(16).toUpperCase()})`);
+        }
+        
+        // Reset local state (WASM state already reset by wasm_ime_commit)
+        this.hasComposition = false;
+        this.compositionStart = -1;
+        this.keySequence = [];
+        
+        return char;
+    }
+    
     updateOverlay() {
         const overlay = document.getElementById('compositionOverlay');
         const keysDisplay = document.getElementById('keysPressed');
@@ -568,6 +600,20 @@ export function setupIme(wasmModule, fieldSelector = 'input[type="text"], textar
     document.addEventListener('mousedown', (e) => {
         if (e.target.matches(fieldSelector)) {
             setTimeout(() => ime.reset(), 0);
+        }
+    });
+    
+    // Commit composition on blur (focus loss)
+    // Use focusout with event delegation to catch all matching fields
+    document.addEventListener('focusout', (e) => {
+        if (e.target.matches(fieldSelector)) {
+            if (ime.isEnabled() && ime.hasComposition) {
+                if (ime.debug) {
+                    console.log('[HangulIme] Focus lost, committing composition');
+                }
+                // Commit finalizes the current syllable and resets state
+                ime.commit(e.target);
+            }
         }
     });
     

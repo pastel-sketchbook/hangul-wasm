@@ -1,0 +1,12 @@
+.{
+    .name = .hangul_wasm,
+    .version = "0.7.2",
+    .fingerprint = 0x2f33c1e7e65d69f,
+    .minimum_zig_version = "0.14.0",
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "hangul.zig",
+        "ime.zig",
+    },
+}

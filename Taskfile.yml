@@ -327,7 +327,10 @@ tasks:
         # Update package.json version
         sed -i.bak "s/\"version\": \"$VERSION\"/\"version\": \"$NEW_VERSION\"/" package.json
         rm -f package.json.bak
-        git add VERSION package.json
+        # Update build.zig.zon version
+        sed -i.bak "s/\.version = \"$VERSION\"/\.version = \"$NEW_VERSION\"/" build.zig.zon
+        rm -f build.zig.zon.bak
+        git add VERSION package.json build.zig.zon
         git commit -m "chore: bump version to $NEW_VERSION"
         git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
         echo "Released v$NEW_VERSION - run 'git push --tags' to publish"
@@ -345,7 +348,10 @@ tasks:
         # Update package.json version
         sed -i.bak "s/\"version\": \"$VERSION\"/\"version\": \"$NEW_VERSION\"/" package.json
         rm -f package.json.bak
-        git add VERSION package.json
+        # Update build.zig.zon version
+        sed -i.bak "s/\.version = \"$VERSION\"/\.version = \"$NEW_VERSION\"/" build.zig.zon
+        rm -f build.zig.zon.bak
+        git add VERSION package.json build.zig.zon
         git commit -m "chore: bump version to $NEW_VERSION"
         git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
         echo "Released v$NEW_VERSION - run 'git push --tags' to publish"
@@ -363,7 +369,10 @@ tasks:
         # Update package.json version
         sed -i.bak "s/\"version\": \"$VERSION\"/\"version\": \"$NEW_VERSION\"/" package.json
         rm -f package.json.bak
-        git add VERSION package.json
+        # Update build.zig.zon version
+        sed -i.bak "s/\.version = \"$VERSION\"/\.version = \"$NEW_VERSION\"/" build.zig.zon
+        rm -f build.zig.zon.bak
+        git add VERSION package.json build.zig.zon
         git commit -m "chore: bump version to $NEW_VERSION"
         git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
         echo "Released v$NEW_VERSION - run 'git push --tags' to publish"

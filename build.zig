@@ -17,6 +17,11 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    // Expose as importable module for consumers (uses their target/optimize)
+    _ = b.addModule("hangul", .{
+        .root_source_file = b.path("hangul.zig"),
+    });
+
     // Create executable without entry point (WASM library)
     const exe = b.addExecutable(.{
         .name = "hangul",
